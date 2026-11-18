@@ -10,6 +10,8 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -404,6 +406,10 @@ private data class AdminAudit(val action:String,val target:String,val created:St
  var audit by remember{mutableStateOf<List<AdminAudit>>(emptyList())}
  var title by remember{mutableStateOf("")};var category by remember{mutableStateOf("Movies")}
  var video by remember{mutableStateOf("")};var poster by remember{mutableStateOf("")};var description by remember{mutableStateOf("")}
+ var selectedCover by remember{mutableStateOf<Uri?>(null)}
+ var categoryMenu by remember{mutableStateOf(false)}
+ val context= LocalContext.current
+ val galleryPicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->selectedCover=uri}
  var editId by remember{mutableStateOf("")}
  var maintenance by remember{mutableStateOf(false)};var registration by remember{mutableStateOf(true)};var vipEnabled by remember{mutableStateOf(true)}
  suspend fun req(method:String,path:String,body:String?=null)=withContext(Dispatchers.IO){supabaseAdminRequest(token,method,path,body)}
@@ -459,13 +465,43 @@ private data class AdminAudit(val action:String,val target:String,val created:St
    "Movies"->LazyColumn{
     item{Text(if(editId.isBlank())"Add Movie" else "Edit Movie",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(10.dp))}
     item{OutlinedTextField(title,{title=it},modifier=Modifier.fillMaxWidth(),label={Text("Movie title")},singleLine=true)}
-    item{OutlinedTextField(category,{category=it},modifier=Modifier.fillMaxWidth(),label={Text("Category")},singleLine=true)}
-    item{OutlinedTextField(poster,{poster=it},modifier=Modifier.fillMaxWidth(),label={Text("Poster URL")},singleLine=true)}
+    item{Box(Modifier.fillMaxWidth()){
+      OutlinedButton(onClick={categoryMenu=true},modifier=Modifier.fillMaxWidth()){
+       Text("Category: $category",modifier=Modifier.weight(1f));Icon(Icons.Default.ArrowDropDown,null)
+      }
+      DropdownMenu(expanded=categoryMenu,onDismissRequest={categoryMenu=false}){
+       allCategories.forEach{item->DropdownMenuItem(text={Text(item)},onClick={category=item;categoryMenu=false})}
+      }
+    }}
+    item{Column(Modifier.fillMaxWidth().padding(vertical=8.dp)){
+      Text("Movie Cover Photo",color=Txt,fontWeight=FontWeight.Bold)
+      val previewModel:Any?=selectedCover?:poster.takeIf{it.isNotBlank()}
+      if(previewModel!=null)AsyncImage(model=previewModel,contentDescription="Cover preview",contentScale=ContentScale.Crop,modifier=Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(14.dp)))
+      else Box(Modifier.fillMaxWidth().height(130.dp).clip(RoundedCornerShape(14.dp)).background(Panel),contentAlignment=Alignment.Center){Text("Cover Photo မရွေးရသေးပါ",color=Muted)}
+      OutlinedButton(onClick={galleryPicker.launch("image/*")},modifier=Modifier.fillMaxWidth().padding(top=8.dp)){
+       Icon(Icons.Default.PhotoLibrary,null);Text(if(selectedCover==null)" Gallery မှ Cover Photo ရွေးရန်" else " ပုံပြန်ရွေးရန်")
+      }
+      Text("JPEG / PNG / WebP • အများဆုံး 10 MB",color=Muted,fontSize=10.sp)
+    }}
     item{OutlinedTextField(video,{video=it},modifier=Modifier.fillMaxWidth(),label={Text("Video URL")},singleLine=true)}
     item{OutlinedTextField(description,{description=it},modifier=Modifier.fillMaxWidth(),label={Text("Description")},minLines=2)}
-    item{Button(onClick={scope.launch{if(title.isBlank()||video.isBlank()){status="Title နှင့် Video URL လိုအပ်သည်။";return@launch};val body=JSONObject().put("title",title).put("category",category).put("poster_url",poster).put("video_url",video).put("description",description).put("is_published",true).toString();val r=if(editId.isBlank())req("POST","/rest/v1/zipmm_movies",body)else req("PATCH","/rest/v1/zipmm_movies?id=eq."+editId,body);status=if(r.first)"Movie saved" else r.second.take(130);if(r.first){title="";category="Movies";poster="";video="";description="";editId=""};loadMoviesAgain(::req){movies=it}}},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(editId.isBlank())"Add Movie" else "Save Movie")}}
+    item{Button(onClick={scope.launch{
+     if(title.isBlank()||video.isBlank()){status="Movie Title နှင့် Video URL လိုအပ်သည်။";return@launch}
+     var finalPoster=poster
+     if(selectedCover!=null){
+      status="Cover Photo Upload လုပ်နေသည်..."
+      val uploaded=withContext(Dispatchers.IO){uploadMoviePoster(context,selectedCover!!,token)}
+      if(!uploaded.first){status="Cover Upload မအောင်မြင်ပါ: "+uploaded.second.take(120);return@launch}
+      finalPoster=uploaded.second
+     }
+     val body=JSONObject().put("title",title).put("category",category).put("poster_url",finalPoster).put("video_url",video).put("description",description).put("is_published",true).toString()
+     val r=if(editId.isBlank())req("POST","/rest/v1/zipmm_movies",body)else req("PATCH","/rest/v1/zipmm_movies?id=eq."+editId,body)
+     status=if(r.first)"Movie saved successfully" else r.second.take(130)
+     if(r.first){title="";category="Movies";poster="";video="";description="";selectedCover=null;editId=""}
+     loadMoviesAgain(::req){movies=it}
+    }},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(editId.isBlank())"Upload Movie" else "Save Movie")}}
     items(movies){m->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(m.title,color=Txt,fontWeight=FontWeight.Bold);Text(m.category,color=Muted,fontSize=10.sp);Row{
-     TextButton(onClick={editId=m.id;title=m.title;category=m.category;poster=m.poster;video=m.video}){Text("Edit")}
+     TextButton(onClick={editId=m.id;title=m.title;category=m.category;poster=m.poster;video=m.video;selectedCover=null}){Text("Edit")}
      TextButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Movie deleted" else r.second.take(100);load()}}){Text("Delete",color=Color(0xFFFF8888))}
     }}}}
    }
@@ -519,6 +555,26 @@ private fun supabasePublicRequest(path:String):Pair<Boolean,String>{
   val body=(if(code in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:""
   (code in 200..299) to body
  }catch(e:Exception){false to (e.localizedMessage?:"Network error")}
+}
+
+private fun uploadMoviePoster(context:Context,uri:Uri,token:String):Pair<Boolean,String>{
+ val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
+ if(key.isBlank()||token.isBlank())return false to "Login token သို့မဟုတ် Supabase key မရှိပါ။"
+ return try{
+  val mime=context.contentResolver.getType(uri)?:return false to "ပုံဖိုင်အမျိုးအစား မသိရှိပါ။"
+  val ext=when(mime.lowercase()){"image/jpeg"->"jpg";"image/png"->"png";"image/webp"->"webp";else->return false to "JPEG, PNG သို့မဟုတ် WebP ပုံသာ Upload တင်နိုင်ပါသည်။"}
+  val bytes=context.contentResolver.openInputStream(uri)?.use{it.readBytes()}?:return false to "ပုံဖိုင်ကို ဖတ်မရပါ။"
+  if(bytes.size>10*1024*1024)return false to "ပုံဖိုင် 10 MB ထက် မကြီးရပါ။"
+  val fileName=java.util.UUID.randomUUID().toString()+"."+ext
+  val c=URL(BuildConfig.SUPABASE_URL+"/storage/v1/object/zipmm-movie-posters/"+fileName).openConnection() as HttpURLConnection
+  c.requestMethod="POST";c.connectTimeout=20000;c.readTimeout=30000;c.doOutput=true
+  c.setRequestProperty("apikey",key);c.setRequestProperty("Authorization","Bearer $token")
+  c.setRequestProperty("Content-Type",mime);c.setRequestProperty("x-upsert","false")
+  c.outputStream.use{it.write(bytes)}
+  val code=c.responseCode
+  val response=(if(code in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:""
+  if(code in 200..299)true to (BuildConfig.SUPABASE_URL+"/storage/v1/object/public/zipmm-movie-posters/"+fileName) else false to response
+ }catch(e:Exception){false to (e.localizedMessage?:"Upload connection error")}
 }
 
 private fun supabaseAdminRequest(token:String,method:String,path:String,body:String?):Pair<Boolean,String>{
