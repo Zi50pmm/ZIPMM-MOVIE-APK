@@ -12,6 +12,8 @@ android {
         targetSdk = 35
         versionCode = 4
         versionName = "1.2.0"
+        buildConfigField("String", "SUPABASE_URL", "\"https://ysrmvbrjuigzmvzaolnc.supabase.co\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: ""}\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -39,10 +41,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-    defaultConfig {
-        buildConfigField("String", "SUPABASE_URL", "\"https://ysrmvbrjuigzmvzaolnc.supabase.co\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: ""}\"")
     }
 }
 dependencies {
