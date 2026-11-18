@@ -303,7 +303,7 @@ private data class AdminPayment(val id:String,val userId:String,val plan:String,
  suspend fun load(){
   loading=true
   val check=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_is_admin","{}")}
-  if(!check.first){status="Admin ခွင့်ပြုချက်မရှိပါ။ Owner Admin SQL ကို Run လုပ်ပြီး ပြန်ဝင်ပါ။";rows=emptyList();loading=false;return}
+  if(!check.first || check.second.trim()!="true"){status="Admin ခွင့်ပြုချက်မရှိပါ။ Owner Admin SQL ကို Run လုပ်ပြီး ပြန်ဝင်ပါ။";rows=emptyList();loading=false;return}
   val result=withContext(Dispatchers.IO){supabaseAdminRequest(token,"GET","/rest/v1/zipmm_vip_payments?status=eq.pending&select=id,user_id,plan,amount_mmk,payment_method,transaction_reference&order=created_at.desc",null)}
   if(result.first){
    val arr=org.json.JSONArray(result.second)
