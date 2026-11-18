@@ -36,7 +36,14 @@ android {
             isMinifyEnabled = false
         }
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+    defaultConfig {
+        buildConfigField("String", "SUPABASE_URL", "\"https://ysrmvbrjuigzmvzaolnc.supabase.co\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: ""}\"")
+    }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
