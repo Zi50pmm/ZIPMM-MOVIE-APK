@@ -157,8 +157,24 @@ revoke all on function public.zipmm_reject_vip_payment(uuid,text) from public, a
 grant execute on function public.zipmm_approve_vip_payment(uuid) to authenticated;
 grant execute on function public.zipmm_reject_vip_payment(uuid,text) to authenticated;
 
--- Admin setup: in Supabase Dashboard -> Authentication -> Users,
--- copy the owner's user UUID, then run this separately as project owner:
--- update auth.users
--- set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
--- where id = 'OWNER-USER-UUID-HERE';
+-- ZIPMM MOVIE OWNER ADMIN bootstrap
+-- Run this block once in Supabase SQL Editor after the owner has registered
+-- and confirmed this email in Supabase Auth.
+do $$
+declare owner_user_id uuid;
+begin
+  select id into owner_user_id
+  from auth.users
+  where lower(email) = lower('flowerkingmyanmar@gmail.com')
+  limit 1;
+
+  if owner_user_id is null then
+    raise exception 'Owner account not found. Register and confirm flowerkingmyanmar@gmail.com first.';
+  end if;
+
+  update auth.users
+  set raw_app_meta_data =
+    coalesce(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role','admin')
+  where id = owner_user_id;
+end $$;
+
