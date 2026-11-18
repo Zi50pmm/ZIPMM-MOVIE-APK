@@ -1,15 +1,26 @@
 # ZIPMM MOVIE
 
-Android app project for ZIPMM MOVIE.
-
-## Current project status
-This is the initial Android app foundation and automated debug-APK workflow. It is **not yet a production streaming service**. The movie catalogue, authentication, secure admin roles, video hosting/streaming, receipt upload, KBZPay/WavePay payment review, and subscription activation require a connected backend and owner-provided configuration.
+Android application source for ZIPMM MOVIE.
 
 ## Build
-Run the **Android APK** workflow from GitHub Actions, or build locally with Android SDK, JDK 17 and Gradle 8.9:
-`gradle assembleDebug`
+GitHub Actions workflow: **Android APK**.
 
-APK output: `app/build/outputs/apk/debug/app-debug.apk`
+Artifacts:
+- ZIPMM-MOVIE-debug: debug build for testing.
+- ZIPMM-MOVIE-release: release variant.
 
-## Payment design
-Customer transfers using the owner's verified KBZPay or WavePay details, submits the receipt, and the admin manually approves or rejects the request. Never put wallet PINs, OTPs, or personal passwords in this repository.
+## Production signing
+To create an installable production-signed APK, add these GitHub Actions repository secrets:
+- ZIPMM_KEYSTORE_BASE64: base64-encoded Android release keystore.
+- ZIPMM_KEYSTORE_PASSWORD
+- ZIPMM_KEY_ALIAS
+- ZIPMM_KEY_PASSWORD
+
+Without these secrets, the release variant is not production-signed. Do not distribute it as a production app.
+
+## Current app scope
+The Android UI includes Movie, India, Korea, Japan and Korean Drama category sections, search, movie detail navigation, watchlist, continue-watching UI and account/payment contact display. Actual catalogue data, authenticated accounts, cloud sync, remote video playback, receipt uploads and admin approval require a connected backend and uploaded licensed movie sources; these are not supplied by the Android shell alone.
+
+Payment display configured by the owner:
+- KBZPay: 09456707261
+- WavePay: 09456707261
