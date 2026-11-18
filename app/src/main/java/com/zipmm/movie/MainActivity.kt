@@ -294,53 +294,104 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
 }
 
 private data class AdminPayment(val id:String,val userId:String,val plan:String,val amount:Int,val method:String,val reference:String)
+private data class AdminUser(val id:String,val email:String,val banned:String)
+private data class AdminMovie(val id:String,val title:String,val category:String,val video:String,val poster:String)
 
 @Composable private fun AdminControlPage(p:PaddingValues,token:String){
  val scope= rememberCoroutineScope()
- var rows by remember{mutableStateOf<List<AdminPayment>>(emptyList())}
- var status by remember{mutableStateOf("Admin ခွင့်ပြုချက် စစ်ဆေးနေသည်...")}
+ var tab by remember{mutableStateOf("Overview")}
+ var status by remember{mutableStateOf("Owner Admin စစ်ဆေးနေသည်...")}
  var loading by remember{mutableStateOf(false)}
+ var isOwner by remember{mutableStateOf(false)}
+ var payments by remember{mutableStateOf<List<AdminPayment>>(emptyList())}
+ var users by remember{mutableStateOf<List<AdminUser>>(emptyList())}
+ var movies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}
+ var title by remember{mutableStateOf("")};var category by remember{mutableStateOf("Movies")}
+ var video by remember{mutableStateOf("")};var poster by remember{mutableStateOf("")};var description by remember{mutableStateOf("")}
+ var editId by remember{mutableStateOf("")}
+ var maintenance by remember{mutableStateOf(false)};var registration by remember{mutableStateOf(true)};var vipEnabled by remember{mutableStateOf(true)}
+ suspend fun req(method:String,path:String,body:String?=null)=withContext(Dispatchers.IO){supabaseAdminRequest(token,method,path,body)}
  suspend fun load(){
   loading=true
-  val check=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_is_admin","{}")}
-  if(!check.first || check.second.trim()!="true"){status="Admin ခွင့်ပြုချက်မရှိပါ။ Owner Admin SQL ကို Run လုပ်ပြီး ပြန်ဝင်ပါ။";rows=emptyList();loading=false;return}
-  val result=withContext(Dispatchers.IO){supabaseAdminRequest(token,"GET","/rest/v1/zipmm_vip_payments?status=eq.pending&select=id,user_id,plan,amount_mmk,payment_method,transaction_reference&order=created_at.desc",null)}
-  if(result.first){
-   val arr=org.json.JSONArray(result.second)
-   rows=(0 until arr.length()).map{val j=arr.getJSONObject(it);AdminPayment(j.optString("id"),j.optString("user_id"),j.optString("plan"),j.optInt("amount_mmk"),j.optString("payment_method"),j.optString("transaction_reference"))}
-   status="စောင့်ဆိုင်းနေသော Payment ${rows.size} ခု"
-  }else status="Payment စာရင်းမရပါ: ${result.second.take(160)}"
+  val a=req("POST","/rest/v1/rpc/zipmm_is_admin","{}")
+  if(!a.first||a.second.trim()!="true"){status="Admin ခွင့်မရှိပါ။ Supabase SQL ကို Run ပြီး ပြန်ဝင်ပါ။";loading=false;return}
+  val o=req("POST","/rest/v1/rpc/zipmm_is_owner","{}");isOwner=o.first&&o.second.trim()=="true"
+  when(tab){
+   "Users"->{val r=req("POST","/rest/v1/rpc/zipmm_admin_list_users","{}");if(r.first){val j=org.json.JSONArray(r.second);users=(0 until j.length()).map{val x=j.getJSONObject(it);AdminUser(x.optString("user_id"),x.optString("email"),x.optString("banned_until"))} }else status=r.second.take(130)}
+   "Movies"->{val r=req("GET","/rest/v1/zipmm_movies?select=id,title,category,video_url,poster_url&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);movies=(0 until j.length()).map{val x=j.getJSONObject(it);AdminMovie(x.optString("id"),x.optString("title"),x.optString("category"),x.optString("video_url"),x.optString("poster_url"))}}else status=r.second.take(130)}
+   "VIP Payments"->{val r=req("GET","/rest/v1/zipmm_vip_payments?status=eq.pending&select=id,user_id,plan,amount_mmk,payment_method,transaction_reference&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);payments=(0 until j.length()).map{val x=j.getJSONObject(it);AdminPayment(x.optString("id"),x.optString("user_id"),x.optString("plan"),x.optInt("amount_mmk"),x.optString("payment_method"),x.optString("transaction_reference"))}}else status=r.second.take(130)}
+   "Settings"->{val r=req("GET","/rest/v1/zipmm_app_settings?select=setting_key,setting_value");if(r.first){val j=org.json.JSONArray(r.second);for(i in 0 until j.length()){val x=j.getJSONObject(i);when(x.optString("setting_key")){"maintenance_mode"->maintenance=x.opt("setting_value").toString()=="true";"registration_enabled"->registration=x.opt("setting_value").toString()=="true";"vip_enabled"->vipEnabled=x.opt("setting_value").toString()=="true"}}}else status=r.second.take(130)}
+  }
+  if(status.startsWith("Owner Admin")||status.startsWith("Admin ခွင့်မရှိ"))status=if(isOwner)"Owner Super Admin ခွင့်ပြုချက်ရရှိပါသည်။" else "Admin ခွင့်ပြုချက်ရရှိပါသည်။"
   loading=false
  }
- LaunchedEffect(token){load()}
- Column(Modifier.fillMaxSize().padding(p).padding(16.dp)){
-  Row(verticalAlignment=Alignment.CenterVertically){Text("Owner Admin Control",color=Txt,fontSize=23.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));IconButton(onClick={scope.launch{load()}}){Icon(Icons.Default.Refresh,null,tint=Purple2)}}
-  Text("Owner: flowerkingmyanmar@gmail.com",color=Muted,fontSize=11.sp)
-  Text(status,color=Purple2,modifier=Modifier.padding(vertical=12.dp))
-  if(loading)CircularProgressIndicator(color=Purple2)
-  LazyColumn{items(rows){item->
-   Card(Modifier.fillMaxWidth().padding(vertical=6.dp),colors=CardDefaults.cardColors(containerColor=Panel)){
-    Column(Modifier.padding(14.dp)){
-     Text("${item.plan} • ${item.amount} MMK",color=Txt,fontWeight=FontWeight.Bold)
-     Text("${item.method} • Ref: ${item.reference}",color=Muted,fontSize=12.sp)
-     Text("User ID: ${item.userId}",color=Muted,fontSize=10.sp)
-     Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(top=10.dp)){
-      Button(onClick={scope.launch{
-       loading=true
-       val r=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_approve_vip_payment",JSONObject().put("payment_id",item.id).toString())}
-       status=if(r.first)"VIP အတည်ပြုပြီးပါပြီ။" else "Approve မအောင်မြင်ပါ: ${r.second.take(100)}"
-       load()
-      }},colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text("Approve VIP")}
-      OutlinedButton(onClick={scope.launch{
-       loading=true
-       val r=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_reject_vip_payment",JSONObject().put("payment_id",item.id).put("note","Rejected by owner admin").toString())}
-       status=if(r.first)"Payment ငြင်းပယ်ပြီးပါပြီ။" else "Reject မအောင်မြင်ပါ: ${r.second.take(100)}"
-       load()
-      }}){Text("Reject")}
-     }
-    }
+ LaunchedEffect(token,tab){load()}
+ Column(Modifier.fillMaxSize().padding(p).padding(14.dp)){
+  Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("ZIPMM SUPER ADMIN",color=Txt,fontSize=21.sp,fontWeight=FontWeight.Black);Text(if(isOwner)"OWNER ACCESS" else "ADMIN ACCESS",color=Purple2,fontSize=10.sp)};IconButton(onClick={scope.launch{load()}}){Icon(Icons.Default.Refresh,null,tint=Purple2)}}
+  Text("Owner: flowerkingmyanmar@gmail.com",color=Muted,fontSize=10.sp)
+  Text(status,color=Purple2,fontSize=11.sp,modifier=Modifier.padding(vertical=7.dp))
+  Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("Overview","Users","Movies","VIP Payments","Settings").forEach{t->FilterChip(selected=tab==t,onClick={tab=t},label={Text(t,fontSize=9.sp)})}}
+  if(loading)LinearProgressIndicator(Modifier.fillMaxWidth(),color=Purple2)
+  when(tab){
+   "Overview"->LazyColumn{
+    item{Text("Control Center",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(vertical=12.dp))}
+    item{AdminActionCard("Users","User စာရင်း၊ Block / Unblock / Delete","OPEN"){tab="Users"}}
+    item{AdminActionCard("Movies","Movie ထည့်၊ ပြင်၊ ဖျက်ရန်","OPEN"){tab="Movies"}}
+    item{AdminActionCard("VIP Payments","KBZPay / WavePay စစ်ဆေးရန်","OPEN"){tab="VIP Payments"}}
+    item{AdminActionCard("App Settings","Maintenance၊ Registration၊ VIP","OPEN"){tab="Settings"}}
+    item{if(isOwner)Text("Owner သာ Admin ခန့်ခြင်း၊ User ဖျက်ခြင်းနှင့် App Settings ပြောင်းခြင်း ပြုလုပ်နိုင်သည်။",color=Color(0xFFFFD36B),fontSize=11.sp,modifier=Modifier.padding(12.dp))}
    }
-  }}
+   "VIP Payments"->LazyColumn{
+    item{Text("Pending Payments: "+payments.size,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
+    items(payments){x->Card(Modifier.fillMaxWidth().padding(5.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(12.dp)){
+     Text(x.plan+" • "+x.amount+" MMK",color=Txt,fontWeight=FontWeight.Bold);Text(x.method+" • Ref: "+x.reference,color=Muted,fontSize=11.sp);Text("User: "+x.userId,color=Muted,fontSize=9.sp)
+     Row{Button(onClick={scope.launch{val r=req("POST","/rest/v1/rpc/zipmm_approve_vip_payment",JSONObject().put("payment_id",x.id).toString());status=if(r.first)"VIP Approved" else r.second.take(100);load()}},colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text("Approve")};OutlinedButton(onClick={scope.launch{val r=req("POST","/rest/v1/rpc/zipmm_reject_vip_payment",JSONObject().put("payment_id",x.id).put("note","Rejected by admin").toString());status=if(r.first)"Payment Rejected" else r.second.take(100);load()}}){Text("Reject")}}
+    }}}
+   }
+   "Users"->LazyColumn{
+    item{Text("User Management: "+users.size,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
+    items(users){u->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){
+     Text(u.email,color=Txt,fontWeight=FontWeight.Bold);Text(u.id,color=Muted,fontSize=9.sp);Text(if(u.banned.isBlank()||u.banned=="null")"ACTIVE" else "BLOCKED",color=Purple2,fontSize=10.sp)
+     Row{OutlinedButton(enabled=u.email!="flowerkingmyanmar@gmail.com",onClick={scope.launch{val b=u.banned.isBlank()||u.banned=="null";val r=req("POST","/rest/v1/rpc/zipmm_admin_set_user_ban",JSONObject().put("p_user_id",u.id).put("p_block",b).toString());status=if(r.first)"User status updated" else r.second.take(100);load()}}){Text(if(u.banned.isBlank()||u.banned=="null")"Block" else "Unblock")}
+      if(isOwner&&u.email!="flowerkingmyanmar@gmail.com")OutlinedButton(onClick={scope.launch{val r=req("POST","/rest/v1/rpc/zipmm_admin_delete_user",JSONObject().put("p_user_id",u.id).toString());status=if(r.first)"User deleted" else r.second.take(100);load()}}){Text("Delete")}
+      if(isOwner&&u.email!="flowerkingmyanmar@gmail.com")OutlinedButton(onClick={scope.launch{val r=req("POST","/rest/v1/rpc/zipmm_owner_set_admin",JSONObject().put("p_user_id",u.id).put("p_make_admin",true).toString());status=if(r.first)"Admin role granted. Re-login required." else r.second.take(100)}}){Text("Make Admin")}
+     }
+    }}}
+   }
+   "Movies"->LazyColumn{
+    item{Text(if(editId.isBlank())"Add Movie" else "Edit Movie",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(10.dp))}
+    item{OutlinedTextField(title,{title=it},modifier=Modifier.fillMaxWidth(),label={Text("Movie title")},singleLine=true)}
+    item{OutlinedTextField(category,{category=it},modifier=Modifier.fillMaxWidth(),label={Text("Category")},singleLine=true)}
+    item{OutlinedTextField(poster,{poster=it},modifier=Modifier.fillMaxWidth(),label={Text("Poster URL")},singleLine=true)}
+    item{OutlinedTextField(video,{video=it},modifier=Modifier.fillMaxWidth(),label={Text("Video URL")},singleLine=true)}
+    item{OutlinedTextField(description,{description=it},modifier=Modifier.fillMaxWidth(),label={Text("Description")},minLines=2)}
+    item{Button(onClick={scope.launch{if(title.isBlank()||video.isBlank()){status="Title နှင့် Video URL လိုအပ်သည်။";return@launch};val body=JSONObject().put("title",title).put("category",category).put("poster_url",poster).put("video_url",video).put("description",description).put("is_published",true).toString();val r=if(editId.isBlank())req("POST","/rest/v1/zipmm_movies",body)else req("PATCH","/rest/v1/zipmm_movies?id=eq."+editId,body);status=if(r.first)"Movie saved" else r.second.take(130);if(r.first){title="";category="Movies";poster="";video="";description="";editId=""};loadMoviesAgain(req){movies=it}}},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(editId.isBlank())"Add Movie" else "Save Movie")}}
+    items(movies){m->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(m.title,color=Txt,fontWeight=FontWeight.Bold);Text(m.category,color=Muted,fontSize=10.sp);Row{
+     TextButton(onClick={editId=m.id;title=m.title;category=m.category;poster=m.poster;video=m.video}){Text("Edit")}
+     TextButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Movie deleted" else r.second.take(100);load()}}){Text("Delete",color=Color(0xFFFF8888))}
+    }}}}
+   }
+   "Settings"->LazyColumn{
+    item{Text("App Settings",color=Txt,fontSize=19.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
+    item{Setting("Maintenance Mode","App maintenance on/off",maintenance){v->maintenance=v;scope.launch{saveZipmmSetting("maintenance_mode",v,req){status=it}}}}
+    item{Setting("Registration","Allow new accounts",registration){v->registration=v;scope.launch{saveZipmmSetting("registration_enabled",v,req){status=it}}}}
+    item{Setting("VIP Membership","VIP purchase enable/disable",vipEnabled){v->vipEnabled=v;scope.launch{saveZipmmSetting("vip_enabled",v,req){status=it}}}}
+    item{if(!isOwner)Text("Setting ပြောင်းလဲခွင့် Owner သာရှိသည်။",color=Muted,fontSize=11.sp)}
+   }
+  }
+ }
+}
+private suspend fun loadMoviesAgain(req:suspend (String,String,String?)->Pair<Boolean,String>,done:(List<AdminMovie>)->Unit){
+ val r=req("GET","/rest/v1/zipmm_movies?select=id,title,category,video_url,poster_url&order=created_at.desc",null)
+ if(r.first){val a=org.json.JSONArray(r.second);done((0 until a.length()).map{val j=a.getJSONObject(it);AdminMovie(j.optString("id"),j.optString("title"),j.optString("category"),j.optString("video_url"),j.optString("poster_url"))})}
+}
+private suspend fun saveZipmmSetting(key:String,value:Boolean,req:suspend (String,String,String?)->Pair<Boolean,String>,report:(String)->Unit){
+ val r=req("POST","/rest/v1/rpc/zipmm_admin_save_setting",JSONObject().put("p_key",key).put("p_value",value).toString())
+ report(if(r.first)"Setting saved: "+key else "Setting error: "+r.second.take(100))
+}
+@Composable private fun AdminActionCard(title:String,detail:String,action:String,onClick:()->Unit){
+ Card(Modifier.fillMaxWidth().padding(vertical=5.dp).clickable(onClick=onClick),colors=CardDefaults.cardColors(containerColor=Panel)){
+  Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,color=Txt,fontWeight=FontWeight.Bold);Text(detail,color=Muted,fontSize=11.sp)};Text(action,color=Purple2,fontSize=11.sp)}
  }
 }
 
