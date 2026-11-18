@@ -276,6 +276,37 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   }}
  }
 }
+private fun zipmmSendResetCode(email:String):Pair<Boolean,String>{
+ val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
+ return try{
+  val c=URL(BuildConfig.SUPABASE_URL+"/auth/v1/recover").openConnection() as HttpURLConnection
+  c.requestMethod="POST";c.doOutput=true;c.setRequestProperty("apikey",key);c.setRequestProperty("Content-Type","application/json")
+  c.outputStream.use{it.write(JSONObject().put("email",email.trim()).toString().toByteArray())}
+  val code=c.responseCode
+  if(code in 200..299) true to "Email သို့ Reset Code ပို့ပြီးပါပြီ။ Inbox / Spam စစ်ပါ။"
+  else false to "Reset Code မပို့နိုင်ပါ။ ခဏစောင့်ပြီး ပြန်စမ်းပါ။"
+ }catch(e:Exception){false to "Internet connection ကိုစစ်ဆေးပါ။"}
+}
+
+private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pair<Boolean,String>{
+ val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
+ return try{
+  val c=URL(BuildConfig.SUPABASE_URL+"/auth/v1/verify").openConnection() as HttpURLConnection
+  c.requestMethod="POST";c.doOutput=true;c.setRequestProperty("apikey",key);c.setRequestProperty("Content-Type","application/json")
+  c.outputStream.use{it.write(JSONObject().put("email",email.trim()).put("token",code.trim()).put("type","recovery").toString().toByteArray())}
+  val status=c.responseCode
+  val body=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:"{}"
+  if(status !in 200..299) return false to "ကုဒ်မှားနေသည် သို့မဟုတ် သက်တမ်းကုန်နေပါသည်။"
+  val access=JSONObject(body).optString("access_token","")
+  if(access.isBlank()) return false to "အတည်ပြုမှုမအောင်မြင်ပါ။"
+  val u=URL(BuildConfig.SUPABASE_URL+"/auth/v1/user").openConnection() as HttpURLConnection
+  u.requestMethod="PUT";u.doOutput=true;u.setRequestProperty("apikey",key);u.setRequestProperty("Authorization","Bearer "+access);u.setRequestProperty("Content-Type","application/json")
+  u.outputStream.use{it.write(JSONObject().put("password",newPassword).toString().toByteArray())}
+  if(u.responseCode in 200..299) true to "Password အသစ်ပြောင်းပြီးပါပြီ။ Login ပြန်ဝင်ပါ။"
+  else false to "Password ပြောင်းမရပါ။ ကုဒ်အသစ်တောင်းပြီး ပြန်စမ်းပါ။"
+ }catch(e:Exception){false to "Internet connection ကိုစစ်ဆေးပါ။"}
+}
+
 @Composable private fun AccountPage(p:PaddingValues,email:String,token:String,busy:Boolean,message:String,openAdmin:()->Unit,login:(String,String,Boolean)->Unit,logout:()->Unit){
  var mail by remember(email){mutableStateOf(email)};var pass by remember{mutableStateOf("")};var signup by remember{mutableStateOf(false)}
  Column(Modifier.fillMaxSize().padding(p).padding(20.dp)){Text("Account",color=Txt,fontSize=25.sp,fontWeight=FontWeight.Bold)
