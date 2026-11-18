@@ -32,7 +32,13 @@ android {
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Use the owner's release keystore when configured; otherwise create a debug-signed
+            // installable test APK and clearly treat it as non-production.
+            signingConfig = if (System.getenv("ZIPMM_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfigs.getByName("debug")
+            } else {
+                signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
         }
     }
