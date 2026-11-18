@@ -10,7 +10,7 @@ on conflict (id) do update set
 drop policy if exists "ZIPMM owner uploads movie posters" on storage.objects;
 create policy "ZIPMM owner uploads movie posters"
 on storage.objects for insert to authenticated
-with check (bucket_id='zipmm-movie-posters' and public.zipmm_is_owner());
+with check (bucket_id='zipmm-movie-posters' and (lower(coalesce(auth.jwt() ->> 'email','')) = 'flowerkingmyanmar@gmail.com' and coalesce(auth.jwt() -> 'app_metadata' ->> 'role','') = 'admin'));
 
 drop policy if exists "ZIPMM owner updates movie posters" on storage.objects;
 create policy "ZIPMM owner updates movie posters"
