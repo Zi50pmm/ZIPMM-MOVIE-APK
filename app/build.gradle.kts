@@ -13,7 +13,13 @@ android {
         versionCode = 4
         versionName = "1.2.0"
         buildConfigField("String", "SUPABASE_URL", "\"https://ysrmvbrjuigzmvzaolnc.supabase.co\"")
-        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"${System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: ""}\"")
+        val supabasePublishableKey = (System.getenv("SUPABASE_PUBLISHABLE_KEY") ?: "")
+            .trim()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\r", "")
+            .replace("\n", "")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
