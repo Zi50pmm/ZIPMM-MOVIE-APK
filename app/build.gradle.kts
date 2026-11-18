@@ -10,17 +10,33 @@ android {
         applicationId = "com.zipmm.movie"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.1.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlinOptions { jvmTarget = "17" }
+    signingConfigs {
+        create("release") {
+            val storePath = System.getenv("ZIPMM_KEYSTORE_PATH")
+            if (!storePath.isNullOrBlank()) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("ZIPMM_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ZIPMM_KEY_ALIAS")
+                keyPassword = System.getenv("ZIPMM_KEY_PASSWORD")
+            }
+        }
     }
-    buildTypes {\n        release {\n            // Temporary debug-key signing for sideload testing. Replace with owner release keystore before public distribution.\n            signingConfig = signingConfigs.getByName("debug")\n            isMinifyEnabled = false\n        }\n    }\n    buildFeatures { compose = true }
+    buildTypes {
+        debug { applicationIdSuffix = ".debug" }
+        release {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+        }
+    }
+    buildFeatures { compose = true }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
@@ -30,5 +46,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
