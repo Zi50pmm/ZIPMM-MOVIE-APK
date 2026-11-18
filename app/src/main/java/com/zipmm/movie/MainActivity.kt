@@ -241,7 +241,7 @@ class MainActivity:ComponentActivity(){
  val player= remember(url){ExoPlayer.Builder(ctx).build().apply{setMediaItem(MediaItem.fromUri(url));prepare();playWhenReady=true}}
  DisposableEffect(player){onDispose{player.release()}}
  Column(Modifier.fillMaxSize().background(Color.Black)){Row(verticalAlignment=Alignment.CenterVertically){IconButton(onClick=back){Icon(Icons.Default.ArrowBack,null,tint=Txt)};Text("ZIPMM MOVIE Player",color=Txt)}
-  AndroidView(factory={PlayerView(it).apply{player.also{this.player=it};useController=true}},modifier=Modifier.fillMaxWidth().weight(1f))
+  AndroidView(factory={ctx->PlayerView(ctx).apply{this.player=player;useController=true}},modifier=Modifier.fillMaxWidth().weight(1f))
  }
 }
 private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:Movie,toast:(String)->Unit){
@@ -249,7 +249,7 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   val name=m.id+".mp4"
   val req=DownloadManager.Request(Uri.parse(m.videoUrl)).setTitle(m.title).setDescription("ZIPMM MOVIE offline download")
    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-   .setDestinationInExternalFilesDir(ctx,Environment.DIRECTORY_MOVIES,name).setAllowedOverMetered(true).setAllowedOverRoaming(false)
+   .setDestinationInExternalFilesDir(ctx,Environment.DIRECTORY_MOVIES,name).setAllowedOverMetered(!prefs.getBoolean("wifi",false)).setAllowedOverRoaming(false)
   val id=(ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
   val path=File(ctx.getExternalFilesDir(Environment.DIRECTORY_MOVIES),name).absolutePath
   prefs.edit().putString("download_"+m.id,path).putString("download_title_"+m.id,m.title).putLong("download_id_"+m.id,id).apply()
