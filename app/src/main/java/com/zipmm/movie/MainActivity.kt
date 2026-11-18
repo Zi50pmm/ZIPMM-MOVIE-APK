@@ -324,7 +324,7 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
      Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){
       RadioButton(chosen,{plan=name},colors=RadioButtonDefaults.colors(selectedColor=Purple2))
       Column(Modifier.weight(1f).padding(start=8.dp)){Text(name,color=Txt,fontWeight=FontWeight.Bold,fontSize=16.sp);Text(desc,color=Muted,fontSize=11.sp)}
-      Text("Admin သတ်မှတ်ရန်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold,fontSize=12.sp)
+      Text(if(name=="1 Month")"3,000 ကျပ်" else "8,000 ကျပ်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold,fontSize=14.sp)
      }
     }
    }
@@ -340,8 +340,8 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   }}
   item{Card(Modifier.fillMaxWidth().padding(16.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFF211A2E)),shape=RoundedCornerShape(15.dp)){
    Column(Modifier.padding(15.dp)){
-    Text("Payment setup လိုအပ်နေပါသည်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold)
-    Text("ရွေးချယ်ထားသော Plan: $plan\nPayment: $payment\n\nVIP စတင်အသုံးပြုနိုင်ရန် Admin မှ Plan စျေးနှုန်း၊ KBZPay / WavePay လက်ခံအကောင့်နှင့် အတည်ပြုစနစ်ကို ချိတ်ဆက်ပေးရန် လိုအပ်ပါသည်။",color=Txt,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))
+    Text("VIP ဈေးနှုန်း",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold)
+    Text("ရွေးချယ်ထားသော Plan: $plan\nကျသင့်ငွေ: ${if(plan=="1 Month")"3,000 ကျပ်" else "8,000 ကျပ်"}\nPayment: $payment\n\nKBZPay / WavePay Merchant ချိတ်ဆက်မှုနှင့် ငွေလွှဲအထောက်အထား အတည်ပြုစနစ်ကို ဆက်လက်တပ်ဆင်ရန် လိုအပ်ပါသည်။",color=Txt,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))
     Button(onClick={showInfo=true},modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple),shape=RoundedCornerShape(12.dp)){Icon(Icons.Default.Lock,null);Text(" VIP Activation Setup")}
    }
   }}
