@@ -10,8 +10,8 @@ android {
         applicationId = "com.zipmm.movie"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -20,7 +20,7 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-    buildFeatures { compose = true }
+    buildTypes {\n        release {\n            // Temporary debug-key signing for sideload testing. Replace with owner release keystore before public distribution.\n            signingConfig = signingConfigs.getByName("debug")\n            isMinifyEnabled = false\n        }\n    }\n    buildFeatures { compose = true }
 }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
