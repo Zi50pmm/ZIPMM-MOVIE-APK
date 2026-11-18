@@ -113,9 +113,12 @@ class MainActivity:ComponentActivity(){
    }
   }){pad->
    when(page){
-    "Home"->HomePage(pad,{page="Search"},{category=it;page="Category"},{selected=it})
+    "Home"->HomePage(pad,{page="Search"},{name->
+     when(name){"VIP"->page="VIP";"Settings"->page="Settings";"My List"->page="My List";else->{category=name;page="Category"}}
+    },{selected=it})
     "Search"->SearchPage(pad,query,{query=it},{selected=it})
     "Category"->CategoryPage(pad,category,{category=it},{selected=it})
+    "VIP"->VipPage(pad,email.isNotBlank(),{page="Account"})
     "My List"->ListPage(pad,"My List",catalog.filter{it.id in saved},{selected=it})
     "Downloads"->DownloadsPage(pad,prefs,{playing=it},{id->prefs.edit().remove("download_"+id).remove("download_title_"+id).apply()})
     "Account"->AccountPage(pad,email,token,busy,message,{mail,pass,signup->
@@ -284,6 +287,77 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   }
  }
 }
+@Composable private fun VipPage(p:PaddingValues,isSignedIn:Boolean,openAccount:()->Unit){
+ var plan by remember{mutableStateOf("1 Month")}
+ var payment by remember{mutableStateOf("KBZPay")}
+ var showInfo by remember{mutableStateOf(false)}
+ LazyColumn(Modifier.fillMaxSize().padding(p),contentPadding=PaddingValues(bottom=28.dp)){
+  item{Box(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(26.dp)).background(Brush.linearGradient(listOf(Color(0xFF4B2382),Color(0xFF171126),Color(0xFFB77925)))).padding(22.dp)){
+   Column{
+    Row(verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.WorkspacePremium,null,tint=Color(0xFFFFD36B),modifier=Modifier.size(34.dp));Text(" ZIPMM VIP",color=Color(0xFFFFD36B),fontSize=25.sp,fontWeight=FontWeight.Black)}
+    Text("GO BEYOND THE SCREEN",color=Txt,fontSize=11.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=7.dp))
+    Text("Your movie world. Without limits.",color=Txt,fontSize=19.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=14.dp))
+    Text("VIP အဖွဲ့ဝင်များအတွက် အထူးအခွင့်အရေးများ",color=Color(0xFFE3D8F2),fontSize=13.sp,modifier=Modifier.padding(top=5.dp))
+   }
+  }}
+  item{Card(Modifier.fillMaxWidth().padding(horizontal=16.dp),colors=CardDefaults.cardColors(containerColor=Panel),shape=RoundedCornerShape(18.dp)){
+   Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){
+    Icon(Icons.Default.VerifiedUser,null,tint=Color(0xFFFFD36B),modifier=Modifier.size(30.dp))
+    Column(Modifier.weight(1f).padding(start=12.dp)){Text("Membership Status",color=Muted,fontSize=11.sp);Text("STANDARD MEMBER",color=Txt,fontWeight=FontWeight.Bold,fontSize=16.sp)}
+    Text("NOT ACTIVE",color=Color(0xFFFFC857),fontSize=10.sp,fontWeight=FontWeight.Black,modifier=Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFF47351B)).padding(horizontal=10.dp,vertical=7.dp))
+   }
+  }}
+  item{Text("VIP အထူးအခွင့်အရေးများ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=24.dp,bottom=12.dp))}
+  item{Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){
+   VipBenefit(Icons.Default.Hd,"HD / Full HD Quality","ရုပ်ရှင်အရည်အသွေးမြင့်ဖြင့် ကြည့်ရှုနိုင်ရန်")
+   VipBenefit(Icons.Default.Block,"Ad-Free Experience","ကြော်ငြာမပါဘဲ အနှောင့်အယှက်ကင်းစွာ")
+   VipBenefit(Icons.Default.Download,"Priority Downloads","Download လုပ်ရာတွင် VIP အထူးဦးစားပေး")
+   VipBenefit(Icons.Default.Star,"VIP Exclusive Movies","VIP သီးသန့်ရုပ်ရှင်များကို ဝင်ရောက်ကြည့်ရှုခွင့်")
+   VipBenefit(Icons.Default.SupportAgent,"Priority Support","အကူအညီတောင်းခံမှု ဦးစားပေးဝန်ဆောင်မှု")
+  }}
+  item{Text("သင့် Membership Plan ကိုရွေးချယ်ပါ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=25.dp,bottom=12.dp))}
+  item{Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+   listOf("1 Month","3 Months","12 Months").forEachIndexed{index,name->
+    val desc=listOf("လစဉ် VIP အသင်းဝင်","၃ လစာ VIP အသင်းဝင်","တစ်နှစ်စာ VIP အသင်းဝင်")[index]
+    val chosen=plan==name
+    Card(Modifier.fillMaxWidth().clickable{plan=name},colors=CardDefaults.cardColors(containerColor=if(chosen)Color(0xFF302044) else Panel),border=if(chosen)androidx.compose.foundation.BorderStroke(1.dp,Purple2) else null,shape=RoundedCornerShape(15.dp)){
+     Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){
+      RadioButton(chosen,{plan=name},colors=RadioButtonDefaults.colors(selectedColor=Purple2))
+      Column(Modifier.weight(1f).padding(start=8.dp)){Text(name,color=Txt,fontWeight=FontWeight.Bold,fontSize=16.sp);Text(desc,color=Muted,fontSize=11.sp)}
+      Text("Admin သတ်မှတ်ရန်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold,fontSize=12.sp)
+     }
+    }
+   }
+  }}
+  item{Text("ငွေပေးချေမည့်နည်းလမ်း",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=23.dp,bottom=10.dp))}
+  item{Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
+   listOf("KBZPay","WavePay").forEach{method->
+    val chosen=payment==method
+    OutlinedButton(onClick={payment=method},modifier=Modifier.weight(1f),colors=ButtonDefaults.outlinedButtonColors(contentColor=if(chosen)Purple2 else Txt),border=androidx.compose.foundation.BorderStroke(if(chosen)2.dp else 1.dp,if(chosen)Purple2 else Muted)){
+     Icon(if(method=="KBZPay")Icons.Default.AccountBalanceWallet else Icons.Default.Payments,null);Text(" $method")
+    }
+   }
+  }}
+  item{Card(Modifier.fillMaxWidth().padding(16.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFF211A2E)),shape=RoundedCornerShape(15.dp)){
+   Column(Modifier.padding(15.dp)){
+    Text("Payment setup လိုအပ်နေပါသည်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold)
+    Text("ရွေးချယ်ထားသော Plan: $plan\nPayment: $payment\n\nVIP စတင်အသုံးပြုနိုင်ရန် Admin မှ Plan စျေးနှုန်း၊ KBZPay / WavePay လက်ခံအကောင့်နှင့် အတည်ပြုစနစ်ကို ချိတ်ဆက်ပေးရန် လိုအပ်ပါသည်။",color=Txt,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))
+    Button(onClick={showInfo=true},modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple),shape=RoundedCornerShape(12.dp)){Icon(Icons.Default.Lock,null);Text(" VIP Activation Setup")}
+   }
+  }}
+  item{Text("မှတ်ချက် - VIP အခွင့်အရေးများကို Admin မှ အမှန်တကယ်ဖွင့်ပေးပြီးမှသာ အသုံးပြုနိုင်ပါမည်။ ဒီအချိန်တွင် VIP status ကို အလိုအလျောက် Active မလုပ်ထားပါ။",color=Muted,fontSize=11.sp,modifier=Modifier.padding(horizontal=18.dp))}
+ }
+ if(showInfo)AlertDialog(onDismissRequest={showInfo=false},title={Text("VIP Activation")},text={Text(if(isSignedIn)"အကောင့်ဝင်ထားပါသည်။ VIP ငွေပေးချေမှုကို အမှန်တကယ်စတင်ရန် Admin ၏ Payment Account နှင့် စျေးနှုန်းများကို အရင်ချိတ်ဆက်ရပါမည်။" else "VIP ဝယ်ယူရန် ZIPMM အကောင့်သို့ အရင်ဝင်ပါ။ ထို့နောက် Admin မှ Payment စနစ်ကို ချိတ်ဆက်ပေးရန် လိုအပ်ပါသည်။")},confirmButton={TextButton(onClick={showInfo=false}){Text("OK")}},dismissButton=if(!isSignedIn)({TextButton(onClick=openAccount){Text("Sign In")}}) else null)
+}
+@Composable private fun VipBenefit(icon: androidx.compose.ui.graphics.vector.ImageVector,title:String,detail:String){
+ Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Panel),shape=RoundedCornerShape(13.dp)){
+  Row(Modifier.padding(13.dp),verticalAlignment=Alignment.CenterVertically){
+   Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF352044)),contentAlignment=Alignment.Center){Icon(icon,null,tint=Color(0xFFFFD36B))}
+   Column(Modifier.padding(start=12.dp)){Text(title,color=Txt,fontWeight=FontWeight.Bold,fontSize=14.sp);Text(detail,color=Muted,fontSize=11.sp)}
+  }
+ }
+}
+
 @Composable private fun SettingsPage(p:PaddingValues,dark:Boolean,wifi:Boolean,onDark:(Boolean)->Unit,onWifi:(Boolean)->Unit,account:()->Unit){
  Column(Modifier.fillMaxSize().padding(p).padding(18.dp)){Text("Settings",color=Txt,fontSize=25.sp,fontWeight=FontWeight.Bold)
   Setting("Dark Theme","ZIPMM dark appearance",dark,onDark);Setting("Wi-Fi only downloads","Restrict downloads on mobile data",wifi,onWifi)
