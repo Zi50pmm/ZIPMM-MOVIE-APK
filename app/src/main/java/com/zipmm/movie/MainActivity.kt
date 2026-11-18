@@ -114,14 +114,15 @@ class MainActivity:ComponentActivity(){
   }){pad->
    when(page){
     "Home"->HomePage(pad,{page="Search"},{name->
-     when(name){"VIP"->page="VIP";"Settings"->page="Settings";"My List"->page="My List";else->{category=name;page="Category"}}
+     when(name){"VIP"->page="VIP";"Settings"->page="Settings";"My List"->page="My List";"Admin"->page="Admin";else->{category=name;page="Category"}}
     },{selected=it})
     "Search"->SearchPage(pad,query,{query=it},{selected=it})
     "Category"->CategoryPage(pad,category,{category=it},{selected=it})
     "VIP"->VipPage(pad,email.isNotBlank(),{page="Account"})
+    "Admin"->AdminControlPage(pad,token)
     "My List"->ListPage(pad,"My List",catalog.filter{it.id in saved},{selected=it})
     "Downloads"->DownloadsPage(pad,prefs,{playing=it},{id->prefs.edit().remove("download_"+id).remove("download_title_"+id).apply()})
-    "Account"->AccountPage(pad,email,token,busy,message,{mail,pass,signup->
+    "Account"->AccountPage(pad,email,token,busy,message,{page="Admin"},{mail,pass,signup->
      scope.launch{busy=true;message="";val res=withContext(Dispatchers.IO){authRequest(mail,pass,signup)};busy=false
       if(res.first!=null){token=res.first!!;email=mail;prefs.edit().putString("token",token).putString("email",email).apply();message="အကောင့်ဝင်ပြီးပါပြီ။"}
       else message=res.second}
@@ -273,10 +274,14 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   }}
  }
 }
-@Composable private fun AccountPage(p:PaddingValues,email:String,token:String,busy:Boolean,message:String,login:(String,String,Boolean)->Unit,logout:()->Unit){
+@Composable private fun AccountPage(p:PaddingValues,email:String,token:String,busy:Boolean,message:String,openAdmin:()->Unit,login:(String,String,Boolean)->Unit,logout:()->Unit){
  var mail by remember(email){mutableStateOf(email)};var pass by remember{mutableStateOf("")};var signup by remember{mutableStateOf(false)}
  Column(Modifier.fillMaxSize().padding(p).padding(20.dp)){Text("Account",color=Txt,fontSize=25.sp,fontWeight=FontWeight.Bold)
-  if(token.isNotBlank()){Icon(Icons.Default.AccountCircle,null,tint=Purple2,modifier=Modifier.size(65.dp));Text(email,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("ZIPMM Member",color=Muted);Button(onClick=logout,modifier=Modifier.fillMaxWidth().padding(top=20.dp)){Text("Log Out")}}
+  if(token.isNotBlank()){Icon(Icons.Default.AccountCircle,null,tint=Purple2,modifier=Modifier.size(65.dp));Text(email,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("ZIPMM Member",color=Muted)
+   if(email.equals("flowerkingmyanmar@gmail.com",true)){
+    Button(onClick=openAdmin,modifier=Modifier.fillMaxWidth().padding(top=18.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Default.AdminPanelSettings,null);Text(" Owner Admin Control")}
+   }
+   Button(onClick=logout,modifier=Modifier.fillMaxWidth().padding(top=12.dp)){Text("Log Out")}}
   else{Text(if(signup)"Create ZIPMM Account" else "Sign In",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
    OutlinedTextField(mail,{mail=it},modifier=Modifier.fillMaxWidth(),label={Text("Email")},singleLine=true)
    OutlinedTextField(pass,{pass=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Password")},singleLine=true)
@@ -287,6 +292,72 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   }
  }
 }
+
+private data class AdminPayment(val id:String,val userId:String,val plan:String,val amount:Int,val method:String,val reference:String)
+
+@Composable private fun AdminControlPage(p:PaddingValues,token:String){
+ val scope= rememberCoroutineScope()
+ var rows by remember{mutableStateOf<List<AdminPayment>>(emptyList())}
+ var status by remember{mutableStateOf("Admin ခွင့်ပြုချက် စစ်ဆေးနေသည်...")}
+ var loading by remember{mutableStateOf(false)}
+ suspend fun load(){
+  loading=true
+  val check=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_is_admin","{}")}
+  if(!check.first){status="Admin ခွင့်ပြုချက်မရှိပါ။ Owner Admin SQL ကို Run လုပ်ပြီး ပြန်ဝင်ပါ။";rows=emptyList();loading=false;return}
+  val result=withContext(Dispatchers.IO){supabaseAdminRequest(token,"GET","/rest/v1/zipmm_vip_payments?status=eq.pending&select=id,user_id,plan,amount_mmk,payment_method,transaction_reference&order=created_at.desc",null)}
+  if(result.first){
+   val arr=org.json.JSONArray(result.second)
+   rows=(0 until arr.length()).map{val j=arr.getJSONObject(it);AdminPayment(j.optString("id"),j.optString("user_id"),j.optString("plan"),j.optInt("amount_mmk"),j.optString("payment_method"),j.optString("transaction_reference"))}
+   status="စောင့်ဆိုင်းနေသော Payment ${rows.size} ခု"
+  }else status="Payment စာရင်းမရပါ: ${result.second.take(160)}"
+  loading=false
+ }
+ LaunchedEffect(token){load()}
+ Column(Modifier.fillMaxSize().padding(p).padding(16.dp)){
+  Row(verticalAlignment=Alignment.CenterVertically){Text("Owner Admin Control",color=Txt,fontSize=23.sp,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));IconButton(onClick={scope.launch{load()}}){Icon(Icons.Default.Refresh,null,tint=Purple2)}}
+  Text("Owner: flowerkingmyanmar@gmail.com",color=Muted,fontSize=11.sp)
+  Text(status,color=Purple2,modifier=Modifier.padding(vertical=12.dp))
+  if(loading)CircularProgressIndicator(color=Purple2)
+  LazyColumn{items(rows){item->
+   Card(Modifier.fillMaxWidth().padding(vertical=6.dp),colors=CardDefaults.cardColors(containerColor=Panel)){
+    Column(Modifier.padding(14.dp)){
+     Text("${item.plan} • ${item.amount} MMK",color=Txt,fontWeight=FontWeight.Bold)
+     Text("${item.method} • Ref: ${item.reference}",color=Muted,fontSize=12.sp)
+     Text("User ID: ${item.userId}",color=Muted,fontSize=10.sp)
+     Row(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.padding(top=10.dp)){
+      Button(onClick={scope.launch{
+       loading=true
+       val r=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_approve_vip_payment",JSONObject().put("payment_id",item.id).toString())}
+       status=if(r.first)"VIP အတည်ပြုပြီးပါပြီ။" else "Approve မအောင်မြင်ပါ: ${r.second.take(100)}"
+       load()
+      }},colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text("Approve VIP")}
+      OutlinedButton(onClick={scope.launch{
+       loading=true
+       val r=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/rpc/zipmm_reject_vip_payment",JSONObject().put("payment_id",item.id).put("note","Rejected by owner admin").toString())}
+       status=if(r.first)"Payment ငြင်းပယ်ပြီးပါပြီ။" else "Reject မအောင်မြင်ပါ: ${r.second.take(100)}"
+       load()
+      }}){Text("Reject")}
+     }
+    }
+   }
+  }}
+ }
+}
+
+private fun supabaseAdminRequest(token:String,method:String,path:String,body:String?):Pair<Boolean,String>{
+ val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
+ if(key.isBlank()||token.isBlank())return false to "Supabase key သို့မဟုတ် Login token မရှိပါ။"
+ return try{
+  val c=URL(BuildConfig.SUPABASE_URL+path).openConnection() as HttpURLConnection
+  c.requestMethod=method;c.connectTimeout=15000;c.readTimeout=15000
+  c.setRequestProperty("apikey",key);c.setRequestProperty("Authorization","Bearer $token");c.setRequestProperty("Content-Type","application/json")
+  if(body!=null){c.doOutput=true;c.outputStream.use{it.write(body.toByteArray())}}
+  val code=c.responseCode
+  val response=(if(code in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:""
+  (code in 200..299) to response
+ }catch(e:Exception){false to (e.localizedMessage?: "Network error")}
+}
+
 @Composable private fun VipPage(p:PaddingValues,isSignedIn:Boolean,openAccount:()->Unit){
  var plan by remember{mutableStateOf("1 Month")}
  var payment by remember{mutableStateOf("KBZPay")}
