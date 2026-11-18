@@ -2,6 +2,8 @@ package com.zipmm.movie
 
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
+import android.util.Base64
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -39,6 +41,10 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.lifecycle.lifecycleScope
+import java.security.MessageDigest
+import java.security.SecureRandom
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -72,11 +78,43 @@ private val catalog=listOf(
 private val allCategories=listOf("Movies","India","Korea","Japan","China","Anime","Cartoon","Series")
 
 class MainActivity:ComponentActivity(){
- override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);setContent{ZipmmApp()}}
+ companion object { val googleSession=MutableStateFlow<Pair<String,String>?>(null) }
+ override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);handleGoogleCallback(intent);setContent{ZipmmApp()}}
+ override fun onNewIntent(intent:Intent){super.onNewIntent(intent);setIntent(intent);handleGoogleCallback(intent)}
+ private fun handleGoogleCallback(intent:Intent?){
+  val data=intent?.data?:return
+  if(data.scheme!="zipmm"||data.host!="login-callback")return
+  val code=data.getQueryParameter("code")?:return
+  val prefs=getSharedPreferences("zipmm",Context.MODE_PRIVATE)
+  val verifier=prefs.getString("google_pkce_verifier","")?:""
+  if(verifier.isBlank())return
+  lifecycleScope.launch {
+   val result=withContext(Dispatchers.IO){
+    try{
+     val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
+     val c=URL(BuildConfig.SUPABASE_URL+"/auth/v1/token?grant_type=pkce").openConnection() as HttpURLConnection
+     c.requestMethod="POST";c.connectTimeout=20000;c.readTimeout=20000;c.doOutput=true
+     c.setRequestProperty("apikey",key);c.setRequestProperty("Content-Type","application/json")
+     c.outputStream.use{it.write(JSONObject().put("auth_code",code).put("code_verifier",verifier).toString().toByteArray())}
+     val status=c.responseCode
+     val body=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:"{}"
+     if(status !in 200..299) null else {
+      val j=JSONObject(body);val access=j.optString("access_token","");val mail=j.optJSONObject("user")?.optString("email","")?:""
+      if(access.isBlank()||mail.isBlank())null else mail to access
+     }
+    }catch(_:Exception){null}
+   }
+   if(result!=null){
+    prefs.edit().putString("email",result.first).putString("token",result.second).remove("google_pkce_verifier").apply()
+    googleSession.value=result
+   }else Toast.makeText(this@MainActivity,"Google Login မအောင်မြင်ပါ။ Supabase / Google OAuth Settings ကိုစစ်ပါ။",Toast.LENGTH_LONG).show()
+  }
+ }
 }
 
 @Composable private fun ZipmmApp(){
  val context= LocalContext.current
+ val googleSession by MainActivity.googleSession.collectAsState()
  val prefs=remember{context.getSharedPreferences("zipmm",Context.MODE_PRIVATE)}
  val scope= rememberCoroutineScope()
  var page by remember{mutableStateOf("Home")}
@@ -92,6 +130,9 @@ class MainActivity:ComponentActivity(){
  var busy by remember{mutableStateOf(false)}
  var message by remember{mutableStateOf("")}
  var movieCatalog by remember{mutableStateOf(catalog)}
+ LaunchedEffect(googleSession){
+  googleSession?.let{(mail,access)->email=mail;token=access;prefs.edit().putString("email",mail).putString("token",access).apply();message="Google ဖြင့် Login / Register အောင်မြင်ပါသည်။";page="Home"}
+ }
  LaunchedEffect(Unit){ val result=withContext(Dispatchers.IO){supabasePublicRequest("/rest/v1/zipmm_movies?is_published=eq.true&select=id,title,category,release_year,rating,poster_url,description,video_url&order=created_at.desc")}; if(result.first){ val a=org.json.JSONArray(result.second); if(a.length()>0) movieCatalog=(0 until a.length()).map{val j=a.getJSONObject(it);Movie(j.optString("id"),j.optString("title"),j.optString("category"),j.optString("release_year"),j.optString("rating"),j.optString("poster_url"),j.optString("description"),j.optString("video_url"))} } }
  fun saveMovie(m:Movie){saved=if(m.id in saved)saved-m.id else saved+m.id;prefs.edit().putStringSet("saved",saved).apply()}
  fun toast(s:String)=Toast.makeText(context,s,Toast.LENGTH_LONG).show()
@@ -124,7 +165,7 @@ class MainActivity:ComponentActivity(){
     "Admin"->AdminControlPage(pad,token)
     "My List"->ListPage(pad,"My List",movieCatalog.filter{it.id in saved},{selected=it})
     "Downloads"->DownloadsPage(pad,prefs,{playing=it},{id->prefs.edit().remove("download_"+id).remove("download_title_"+id).apply()})
-    "Account"->AccountPage(pad,email,token,busy,message,{page="Admin"},{mail,pass,signup->
+    "Account"->AccountPage(pad,email,token,busy,message,{page="Admin"},{startGoogleOAuth(context)},{mail,pass,signup->
      scope.launch{busy=true;message="";val res=withContext(Dispatchers.IO){authRequest(mail,pass,signup)};busy=false
       if(res.first!=null){token=res.first!!;email=mail;prefs.edit().putString("token",token).putString("email",email).apply();message="အကောင့်ဝင်ပြီးပါပြီ။"}
       else message=res.second}
@@ -307,7 +348,7 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
  }catch(e:Exception){false to "Internet connection ကိုစစ်ဆေးပါ။"}
 }
 
-@Composable private fun AccountPage(p:PaddingValues,email:String,token:String,busy:Boolean,message:String,openAdmin:()->Unit,login:(String,String,Boolean)->Unit,logout:()->Unit){
+@Composable private fun AccountPage(p:PaddingValues,email:String,token:String,busy:Boolean,message:String,openAdmin:()->Unit,googleLogin:()->Unit,login:(String,String,Boolean)->Unit,logout:()->Unit){
  val scope= rememberCoroutineScope()
  var mail by remember(email){mutableStateOf(email)};var pass by remember{mutableStateOf("")};var signup by remember{mutableStateOf(false)}
  var resetMode by remember{mutableStateOf(false)};var sent by remember{mutableStateOf(false)}
@@ -332,6 +373,10 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
    if(resetMessage.isNotBlank())Text(resetMessage,color=Purple2,modifier=Modifier.padding(top=8.dp))
   }else{
    Text(if(signup)"Create ZIPMM Account" else "Sign In",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
+   OutlinedButton(onClick=googleLogin,modifier=Modifier.fillMaxWidth().padding(top=14.dp),shape=RoundedCornerShape(12.dp),colors=ButtonDefaults.outlinedButtonColors(contentColor=Txt)){
+    Text("G",color=Color(0xFF4285F4),fontWeight=FontWeight.Black,fontSize=20.sp);Text("  Continue with Google",fontWeight=FontWeight.Bold)
+   }
+   Text("Google အကောင့်အသစ်ဖြင့် Register လုပ်နိုင်ပြီး ရှိပြီးသားအကောင့်ဖြင့် Login ဝင်နိုင်ပါသည်။",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=6.dp))
    OutlinedTextField(mail,{mail=it},modifier=Modifier.fillMaxWidth(),label={Text("Email")},singleLine=true)
    OutlinedTextField(pass,{pass=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Password")},singleLine=true)
    Button(onClick={if(mail.isNotBlank()&&pass.length>=6)login(mail.trim(),pass,signup)},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(busy)"Please wait..." else if(signup)"Create Account" else "Sign In")}
@@ -449,6 +494,19 @@ private suspend fun saveZipmmSetting(key:String,value:Boolean,req:suspend (Strin
  }
 }
 
+
+
+private fun startGoogleOAuth(context:Context){
+ try{
+  val random=ByteArray(32);SecureRandom().nextBytes(random)
+  val verifier=Base64.encodeToString(random,Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+  val challenge=Base64.encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()),Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+  context.getSharedPreferences("zipmm",Context.MODE_PRIVATE).edit().putString("google_pkce_verifier",verifier).apply()
+  val redirect="zipmm://login-callback"
+  val url=BuildConfig.SUPABASE_URL+"/auth/v1/authorize?provider=google&redirect_to="+Uri.encode(redirect)+"&code_challenge="+Uri.encode(challenge)+"&code_challenge_method=s256"
+  context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))
+ }catch(e:Exception){Toast.makeText(context,"Google Login ဖွင့်မရပါ: "+(e.localizedMessage?:""),Toast.LENGTH_LONG).show()}
+}
 
 private fun supabasePublicRequest(path:String):Pair<Boolean,String>{
  val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
