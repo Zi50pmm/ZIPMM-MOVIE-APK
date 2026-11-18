@@ -10,8 +10,8 @@ android {
         applicationId = "com.zipmm.movie"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.2.0"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -32,13 +32,7 @@ android {
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
         release {
-            // Use the owner's release keystore when configured; otherwise create a debug-signed
-            // installable test APK and clearly treat it as non-production.
-            signingConfig = if (System.getenv("ZIPMM_KEYSTORE_PATH").isNullOrBlank()) {
-                signingConfigs.getByName("debug")
-            } else {
-                signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
         }
     }
