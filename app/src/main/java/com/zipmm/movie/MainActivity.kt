@@ -91,6 +91,8 @@ class MainActivity:ComponentActivity(){
  var wifi by remember{mutableStateOf(prefs.getBoolean("wifi",false))}
  var busy by remember{mutableStateOf(false)}
  var message by remember{mutableStateOf("")}
+ var movieCatalog by remember{mutableStateOf(catalog)}
+ LaunchedEffect(Unit){ val result=withContext(Dispatchers.IO){supabasePublicRequest("/rest/v1/zipmm_movies?is_published=eq.true&select=id,title,category,release_year,rating,poster_url,description,video_url&order=created_at.desc")}; if(result.first){ val a=org.json.JSONArray(result.second); if(a.length()>0) movieCatalog=(0 until a.length()).map{val j=a.getJSONObject(it);Movie(j.optString("id"),j.optString("title"),j.optString("category"),j.optString("release_year"),j.optString("rating"),j.optString("poster_url"),j.optString("description"),j.optString("video_url"))} } }
  fun saveMovie(m:Movie){saved=if(m.id in saved)saved-m.id else saved+m.id;prefs.edit().putStringSet("saved",saved).apply()}
  fun toast(s:String)=Toast.makeText(context,s,Toast.LENGTH_LONG).show()
  MaterialTheme(colorScheme=darkColorScheme(primary=Purple,background=Bg,surface=Panel,onBackground=Txt,onSurface=Txt)){
@@ -113,14 +115,14 @@ class MainActivity:ComponentActivity(){
    }
   }){pad->
    when(page){
-    "Home"->HomePage(pad,{page="Search"},{name->
+    "Home"->HomePage(pad,movieCatalog,{page="Search"},{name->
      when(name){"VIP"->page="VIP";"Settings"->page="Settings";"My List"->page="My List";"Admin"->page="Admin";else->{category=name;page="Category"}}
     },{selected=it})
-    "Search"->SearchPage(pad,query,{query=it},{selected=it})
-    "Category"->CategoryPage(pad,category,{category=it},{selected=it})
+    "Search"->SearchPage(pad,query,movieCatalog,{query=it},{selected=it})
+    "Category"->CategoryPage(pad,category,movieCatalog,{category=it},{selected=it})
     "VIP"->VipPage(pad,email.isNotBlank(),{page="Account"})
     "Admin"->AdminControlPage(pad,token)
-    "My List"->ListPage(pad,"My List",catalog.filter{it.id in saved},{selected=it})
+    "My List"->ListPage(pad,"My List",movieCatalog.filter{it.id in saved},{selected=it})
     "Downloads"->DownloadsPage(pad,prefs,{playing=it},{id->prefs.edit().remove("download_"+id).remove("download_title_"+id).apply()})
     "Account"->AccountPage(pad,email,token,busy,message,{page="Admin"},{mail,pass,signup->
      scope.launch{busy=true;message="";val res=withContext(Dispatchers.IO){authRequest(mail,pass,signup)};busy=false
@@ -128,13 +130,13 @@ class MainActivity:ComponentActivity(){
       else message=res.second}
     },{token="";email="";prefs.edit().remove("token").remove("email").apply();message="အကောင့်မှ ထွက်ပြီးပါပြီ။"})
     "Settings"->SettingsPage(pad,dark,wifi,{dark=it;prefs.edit().putBoolean("dark",it).apply()},{wifi=it;prefs.edit().putBoolean("wifi",it).apply()},{page="Account"})
-    else->HomePage(pad,{page="Search"},{category=it;page="Category"},{selected=it})
+    else->HomePage(pad,movieCatalog,{page="Search"},{category=it;page="Category"},{selected=it})
    }
   }
  }
 }
 
-@Composable private fun HomePage(p:PaddingValues,onSearch:()->Unit,onCategory:(String)->Unit,onMovie:(Movie)->Unit){
+@Composable private fun HomePage(p:PaddingValues,movies:List<Movie>,onSearch:()->Unit,onCategory:(String)->Unit,onMovie:(Movie)->Unit){
  LazyColumn(Modifier.fillMaxSize().padding(p),contentPadding=PaddingValues(bottom=18.dp)){
   item{Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){
    Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(Brush.linearGradient(listOf(Purple2,Purple))),contentAlignment=Alignment.Center){Icon(Icons.Default.PlayArrow,null,tint=Txt)}
@@ -142,7 +144,7 @@ class MainActivity:ComponentActivity(){
    IconButton(onClick=onSearch){Icon(Icons.Default.Search,null,tint=Txt)}
    IconButton(onClick={onCategory("Settings")}){Icon(Icons.Default.Settings,null,tint=Txt)}
   }}
-  item{Hero{onMovie(catalog.first())}}
+  item{Hero{onMovie(movies.firstOrNull()?:catalog.first())}}
   item{LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(9.dp),modifier=Modifier.padding(top=15.dp)){
    items(listOf("Movies","Series","Anime","Cartoon","Favorites","VIP")){name->
     Column(Modifier.width(66.dp).clickable{onCategory(if(name=="Favorites")"My List" else name)},horizontalAlignment=Alignment.CenterHorizontally){
@@ -153,21 +155,21 @@ class MainActivity:ComponentActivity(){
    }
   }}
   item{Section("Trending Movies"){onCategory("Trending Movies")}}
-  item{Rail(catalog.take(4),onMovie)}
+  item{Rail(movies.take(4),onMovie)}
   item{Section("Indian Movies"){onCategory("India")}}
-  item{Rail(catalog.filter{it.category=="India"},onMovie)}
+  item{Rail(movies.filter{it.category=="India"},onMovie)}
   item{Section("Korean Movies"){onCategory("Korea")}}
-  item{Rail(catalog.filter{it.category=="Korea"},onMovie)}
+  item{Rail(movies.filter{it.category=="Korea"},onMovie)}
   item{Section("Japanese Movies"){onCategory("Japan")}}
-  item{Rail(catalog.filter{it.category=="Japan"},onMovie)}
+  item{Rail(movies.filter{it.category=="Japan"},onMovie)}
   item{Section("Chinese Movies"){onCategory("China")}}
   item{EmptyHint("Chinese Movies များကို Admin က ထည့်သွင်းသည့်အခါ ဒီနေရာတွင် ပေါ်ပါမည်။")}
   item{Section("Anime"){onCategory("Anime")}}
-  item{Rail(catalog.filter{it.category=="Anime"},onMovie)}
+  item{Rail(movies.filter{it.category=="Anime"},onMovie)}
   item{Section("Cartoon"){onCategory("Cartoon")}}
-  item{Rail(catalog.filter{it.category=="Cartoon"},onMovie)}
+  item{Rail(movies.filter{it.category=="Cartoon"},onMovie)}
   item{Section("Latest Series"){onCategory("Series")}}
-  item{Rail(catalog.filter{it.category=="Korea"||it.category=="Japan"},onMovie)}
+  item{Rail(movies.filter{it.category=="Korea"||it.category=="Japan"},onMovie)}
  }
 }
 @Composable private fun Hero(onClick:()->Unit){
@@ -202,8 +204,8 @@ class MainActivity:ComponentActivity(){
 }
 @Composable private fun EmptyHint(s:String){Text(s,color=Muted,fontSize=12.sp,modifier=Modifier.padding(horizontal=18.dp,vertical=10.dp))}
 
-@Composable private fun CategoryPage(p:PaddingValues,category:String,onCategory:(String)->Unit,onMovie:(Movie)->Unit){
- val list=when(category){"Trending Movies"->catalog.take(4);"Movies"->catalog.filter{it.category=="Movies"};"Series"->catalog.filter{it.category=="Korea"||it.category=="Japan"};else->catalog.filter{it.category.equals(category,true)}}
+@Composable private fun CategoryPage(p:PaddingValues,category:String,movies:List<Movie>,onCategory:(String)->Unit,onMovie:(Movie)->Unit){
+ val list=when(category){"Trending Movies"->movies.take(4);"Movies"->movies.filter{it.category=="Movies"};"Series"->movies.filter{it.category=="Korea"||it.category=="Japan"};else->movies.filter{it.category.equals(category,true)}}
  Column(Modifier.fillMaxSize().padding(p)){
   Text(category,color=Txt,fontSize=24.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(16.dp))
   LazyRow(contentPadding=PaddingValues(horizontal=10.dp)){items(allCategories){c->FilterChip(selected=category==c,onClick={onCategory(c)},label={Text(c)},modifier=Modifier.padding(horizontal=3.dp))}}
@@ -214,10 +216,10 @@ class MainActivity:ComponentActivity(){
   }}
  }
 }
-@Composable private fun SearchPage(p:PaddingValues,q:String,onQ:(String)->Unit,onMovie:(Movie)->Unit){
+@Composable private fun SearchPage(p:PaddingValues,q:String,movies:List<Movie>,onQ:(String)->Unit,onMovie:(Movie)->Unit){
  Column(Modifier.fillMaxSize().padding(p).padding(16.dp)){Text("Search Movies",color=Txt,fontSize=24.sp,fontWeight=FontWeight.Bold)
   OutlinedTextField(q,onQ,modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Movie, country or category")},leadingIcon={Icon(Icons.Default.Search,null)})
-  LazyColumn{items(catalog.filter{it.title.contains(q,true)||it.category.contains(q,true)}){MovieRow(it,onMovie)}}
+  LazyColumn{items(movies.filter{it.title.contains(q,true)||it.category.contains(q,true)}){MovieRow(it,onMovie)}}
  }
 }
 @Composable private fun ListPage(p:PaddingValues,title:String,list:List<Movie>,onMovie:(Movie)->Unit){
@@ -393,6 +395,20 @@ private suspend fun saveZipmmSetting(key:String,value:Boolean,req:suspend (Strin
  Card(Modifier.fillMaxWidth().padding(vertical=5.dp).clickable(onClick=onClick),colors=CardDefaults.cardColors(containerColor=Panel)){
   Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,color=Txt,fontWeight=FontWeight.Bold);Text(detail,color=Muted,fontSize=11.sp)};Text(action,color=Purple2,fontSize=11.sp)}
  }
+}
+
+
+private fun supabasePublicRequest(path:String):Pair<Boolean,String>{
+ val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
+ if(key.isBlank())return false to "Supabase publishable key missing"
+ return try{
+  val c=URL(BuildConfig.SUPABASE_URL+path).openConnection() as HttpURLConnection
+  c.requestMethod="GET";c.connectTimeout=12000;c.readTimeout=12000
+  c.setRequestProperty("apikey",key);c.setRequestProperty("Authorization","Bearer "+key)
+  val code=c.responseCode
+  val body=(if(code in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:""
+  (code in 200..299) to body
+ }catch(e:Exception){false to (e.localizedMessage?:"Network error")}
 }
 
 private fun supabaseAdminRequest(token:String,method:String,path:String,body:String?):Pair<Boolean,String>{
