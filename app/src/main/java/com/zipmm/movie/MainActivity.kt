@@ -371,7 +371,7 @@ private data class AdminAudit(val action:String,val target:String,val created:St
     item{OutlinedTextField(poster,{poster=it},modifier=Modifier.fillMaxWidth(),label={Text("Poster URL")},singleLine=true)}
     item{OutlinedTextField(video,{video=it},modifier=Modifier.fillMaxWidth(),label={Text("Video URL")},singleLine=true)}
     item{OutlinedTextField(description,{description=it},modifier=Modifier.fillMaxWidth(),label={Text("Description")},minLines=2)}
-    item{Button(onClick={scope.launch{if(title.isBlank()||video.isBlank()){status="Title နှင့် Video URL လိုအပ်သည်။";return@launch};val body=JSONObject().put("title",title).put("category",category).put("poster_url",poster).put("video_url",video).put("description",description).put("is_published",true).toString();val r=if(editId.isBlank())req("POST","/rest/v1/zipmm_movies",body)else req("PATCH","/rest/v1/zipmm_movies?id=eq."+editId,body);status=if(r.first)"Movie saved" else r.second.take(130);if(r.first){title="";category="Movies";poster="";video="";description="";editId=""};loadMoviesAgain(req){movies=it}}},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(editId.isBlank())"Add Movie" else "Save Movie")}}
+    item{Button(onClick={scope.launch{if(title.isBlank()||video.isBlank()){status="Title နှင့် Video URL လိုအပ်သည်။";return@launch};val body=JSONObject().put("title",title).put("category",category).put("poster_url",poster).put("video_url",video).put("description",description).put("is_published",true).toString();val r=if(editId.isBlank())req("POST","/rest/v1/zipmm_movies",body)else req("PATCH","/rest/v1/zipmm_movies?id=eq."+editId,body);status=if(r.first)"Movie saved" else r.second.take(130);if(r.first){title="";category="Movies";poster="";video="";description="";editId=""};loadMoviesAgain(::req){movies=it}}},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(editId.isBlank())"Add Movie" else "Save Movie")}}
     items(movies){m->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(m.title,color=Txt,fontWeight=FontWeight.Bold);Text(m.category,color=Muted,fontSize=10.sp);Row{
      TextButton(onClick={editId=m.id;title=m.title;category=m.category;poster=m.poster;video=m.video}){Text("Edit")}
      TextButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Movie deleted" else r.second.take(100);load()}}){Text("Delete",color=Color(0xFFFF8888))}
@@ -380,9 +380,9 @@ private data class AdminAudit(val action:String,val target:String,val created:St
    "Audit"->LazyColumn{item{Text("Recent Admin Actions",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))};items(audit){x->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(x.action,color=Txt,fontWeight=FontWeight.Bold);Text(x.target,color=Muted,fontSize=10.sp);Text(x.created,color=Muted,fontSize=9.sp);Text(x.details,color=Muted,fontSize=9.sp,maxLines=3)}}}}
    "Settings"->LazyColumn{
     item{Text("App Settings",color=Txt,fontSize=19.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
-    item{Setting("Maintenance Mode","App maintenance on/off",maintenance){v->maintenance=v;scope.launch{saveZipmmSetting("maintenance_mode",v,req){status=it}}}}
-    item{Setting("Registration","Allow new accounts",registration){v->registration=v;scope.launch{saveZipmmSetting("registration_enabled",v,req){status=it}}}}
-    item{Setting("VIP Membership","VIP purchase enable/disable",vipEnabled){v->vipEnabled=v;scope.launch{saveZipmmSetting("vip_enabled",v,req){status=it}}}}
+    item{Setting("Maintenance Mode","App maintenance on/off",maintenance){v->maintenance=v;scope.launch{saveZipmmSetting("maintenance_mode",v,::req){status=it}}}}
+    item{Setting("Registration","Allow new accounts",registration){v->registration=v;scope.launch{saveZipmmSetting("registration_enabled",v,::req){status=it}}}}
+    item{Setting("VIP Membership","VIP purchase enable/disable",vipEnabled){v->vipEnabled=v;scope.launch{saveZipmmSetting("vip_enabled",v,::req){status=it}}}}
     item{if(!isOwner)Text("Setting ပြောင်းလဲခွင့် Owner သာရှိသည်။",color=Muted,fontSize=11.sp)}
    }
   }
