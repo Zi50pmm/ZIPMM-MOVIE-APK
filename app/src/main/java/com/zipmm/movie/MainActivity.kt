@@ -317,8 +317,8 @@ private fun downloadMovie(ctx:Context,prefs:android.content.SharedPreferences,m:
   }}
   item{Text("သင့် Membership Plan ကိုရွေးချယ်ပါ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=25.dp,bottom=12.dp))}
   item{Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   listOf("1 Month","3 Months","12 Months").forEachIndexed{index,name->
-    val desc=listOf("လစဉ် VIP အသင်းဝင်","၃ လစာ VIP အသင်းဝင်","တစ်နှစ်စာ VIP အသင်းဝင်")[index]
+   listOf("1 Month","3 Months").forEachIndexed{index,name->
+    val desc=listOf("လစဉ် VIP အသင်းဝင်","၃ လစာ VIP အသင်းဝင်")[index]
     val chosen=plan==name
     Card(Modifier.fillMaxWidth().clickable{plan=name},colors=CardDefaults.cardColors(containerColor=if(chosen)Color(0xFF302044) else Panel),border=if(chosen)androidx.compose.foundation.BorderStroke(1.dp,Purple2) else null,shape=RoundedCornerShape(15.dp)){
      Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){
