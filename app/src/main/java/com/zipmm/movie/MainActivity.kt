@@ -308,24 +308,40 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
 }
 
 @Composable private fun AccountPage(p:PaddingValues,email:String,token:String,busy:Boolean,message:String,openAdmin:()->Unit,login:(String,String,Boolean)->Unit,logout:()->Unit){
+ val scope= rememberCoroutineScope()
  var mail by remember(email){mutableStateOf(email)};var pass by remember{mutableStateOf("")};var signup by remember{mutableStateOf(false)}
+ var resetMode by remember{mutableStateOf(false)};var sent by remember{mutableStateOf(false)}
+ var code by remember{mutableStateOf("")};var newPassword by remember{mutableStateOf("")}
+ var resetBusy by remember{mutableStateOf(false)};var resetMessage by remember{mutableStateOf("")}
  Column(Modifier.fillMaxSize().padding(p).padding(20.dp)){Text("Account",color=Txt,fontSize=25.sp,fontWeight=FontWeight.Bold)
   if(token.isNotBlank()){Icon(Icons.Default.AccountCircle,null,tint=Purple2,modifier=Modifier.size(65.dp));Text(email,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("ZIPMM Member",color=Muted)
-   if(email.equals("flowerkingmyanmar@gmail.com",true)){
-    Button(onClick=openAdmin,modifier=Modifier.fillMaxWidth().padding(top=18.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Default.AdminPanelSettings,null);Text(" Owner Admin Control")}
-   }
+   if(email.equals("flowerkingmyanmar@gmail.com",true)){Button(onClick=openAdmin,modifier=Modifier.fillMaxWidth().padding(top=18.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Default.AdminPanelSettings,null);Text(" Owner Admin Control")}}
    Button(onClick=logout,modifier=Modifier.fillMaxWidth().padding(top=12.dp)){Text("Log Out")}}
-  else{Text(if(signup)"Create ZIPMM Account" else "Sign In",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
+  else if(resetMode){
+   Text("Forgot Password",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
+   OutlinedTextField(mail,{mail=it},modifier=Modifier.fillMaxWidth(),label={Text("Account Email")},singleLine=true)
+   if(!sent)Button(onClick={scope.launch{resetBusy=true;val r=withContext(Dispatchers.IO){zipmmSendResetCode(mail)};resetBusy=false;resetMessage=r.second;if(r.first)sent=true}},enabled=!resetBusy&&mail.contains("@"),modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(resetBusy)"Sending..." else "Send Reset Code")}
+   else{
+    Text("Email ထဲရောက်လာသော Recovery Code ကိုထည့်ပါ။",color=Muted,fontSize=12.sp)
+    OutlinedTextField(code,{code=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Recovery Code")},singleLine=true)
+    OutlinedTextField(newPassword,{newPassword=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("New Password (အနည်းဆုံး 6 လုံး)")},singleLine=true)
+    Button(onClick={scope.launch{resetBusy=true;val r=withContext(Dispatchers.IO){zipmmApplyResetCode(mail,code,newPassword)};resetBusy=false;resetMessage=r.second;if(r.first){resetMode=false;sent=false;code="";newPassword="";pass=""}}},enabled=!resetBusy&&code.isNotBlank()&&newPassword.length>=6,modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(resetBusy)"Updating..." else "Set New Password")}
+    TextButton(onClick={scope.launch{resetBusy=true;val r=withContext(Dispatchers.IO){zipmmSendResetCode(mail)};resetBusy=false;resetMessage=r.second}}){Text("ကုဒ်အသစ်ပြန်ပို့ရန်")}
+   }
+   TextButton(onClick={resetMode=false;sent=false;resetMessage=""}){Text("Back to Sign In")}
+   if(resetMessage.isNotBlank())Text(resetMessage,color=Purple2,modifier=Modifier.padding(top=8.dp))
+  }else{
+   Text(if(signup)"Create ZIPMM Account" else "Sign In",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
    OutlinedTextField(mail,{mail=it},modifier=Modifier.fillMaxWidth(),label={Text("Email")},singleLine=true)
    OutlinedTextField(pass,{pass=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Password")},singleLine=true)
-   Button(onClick={if(mail.isNotBlank()&&pass.length>=6)login(mail,pass,signup)},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(busy)"Please wait..." else if(signup)"Create Account" else "Sign In")}
+   Button(onClick={if(mail.isNotBlank()&&pass.length>=6)login(mail.trim(),pass,signup)},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(busy)"Please wait..." else if(signup)"Create Account" else "Sign In")}
    TextButton(onClick={signup=!signup}){Text(if(signup)"Already registered? Sign In" else "Create a new account")}
+   if(!signup)TextButton(onClick={resetMode=true;resetMessage=""}){Text("Forgot Password?")}
    if(message.isNotBlank())Text(message,color=Purple2,modifier=Modifier.padding(top=10.dp))
    Text("အကောင့်စနစ်အတွက် Internet နှင့် Supabase Auth ဖွင့်ထားရန်လိုပါတယ်။",color=Muted,fontSize=12.sp,modifier=Modifier.padding(top=14.dp))
   }
  }
 }
-
 private data class AdminPayment(val id:String,val userId:String,val plan:String,val amount:Int,val method:String,val reference:String)
 private data class AdminUser(val id:String,val email:String,val banned:String)
 private data class AdminMovie(val id:String,val title:String,val category:String,val video:String,val poster:String)
