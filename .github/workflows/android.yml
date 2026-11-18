@@ -28,18 +28,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.9'
-      - name: Configure preinstalled Android SDK
-        run: |
-          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
-          echo "/usr/local/lib/android/sdk/platform-tools" >> "$GITHUB_PATH"
-          echo "/usr/local/lib/android/sdk/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
       - name: Install Android SDK packages
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
         run: |
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager"
-          yes | "$SDKMANAGER" --licenses || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Build debug APK
         run: gradle assembleDebug
       - name: Upload debug APK
@@ -60,7 +54,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Release APK skipped. Add ZIPMM_KEYSTORE_BASE64, ZIPMM_KEYSTORE_PASSWORD, ZIPMM_KEY_ALIAS and ZIPMM_KEY_PASSWORD repository secrets."
+            echo "::warning::Production APK skipped. Configure the four ZIPMM release-signing repository secrets."
           fi
       - name: Configure release keystore
         if: steps.signing.outputs.ready == 'true'
