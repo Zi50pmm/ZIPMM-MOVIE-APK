@@ -198,7 +198,7 @@ class MainActivity:ComponentActivity(){
    }
   }}
   item{Section("Trending Movies"){onCategory("Trending Movies")}}
-  item{Rail(movies.take(4),onMovie)}
+  item{Rail(movies.filter{it.isTrending},onMovie)}
   item{Section("Indian Movies"){onCategory("India")}}
   item{Rail(movies.filter{it.category=="India"},onMovie)}
   item{Section("Korean Movies"){onCategory("Korea")}}
@@ -375,10 +375,6 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
    if(resetMessage.isNotBlank())Text(resetMessage,color=Purple2,modifier=Modifier.padding(top=8.dp))
   }else{
    Text(if(signup)"Create ZIPMM Account" else "Sign In",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
-   OutlinedButton(onClick=googleLogin,modifier=Modifier.fillMaxWidth().padding(top=14.dp),shape=RoundedCornerShape(12.dp),colors=ButtonDefaults.outlinedButtonColors(contentColor=Txt)){
-    Text("G",color=Color(0xFF4285F4),fontWeight=FontWeight.Black,fontSize=20.sp);Text("  Continue with Google",fontWeight=FontWeight.Bold)
-   }
-   Text("Google အကောင့်အသစ်ဖြင့် Register လုပ်နိုင်ပြီး ရှိပြီးသားအကောင့်ဖြင့် Login ဝင်နိုင်ပါသည်။",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=6.dp))
    OutlinedTextField(mail,{mail=it},modifier=Modifier.fillMaxWidth(),label={Text("Email")},singleLine=true)
    OutlinedTextField(pass,{pass=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Password")},singleLine=true)
    Button(onClick={if(mail.isNotBlank()&&pass.length>=6)login(mail.trim(),pass,signup)},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(busy)"Please wait..." else if(signup)"Create Account" else "Sign In")}
@@ -500,9 +496,10 @@ private data class AdminAudit(val action:String,val target:String,val created:St
      if(r.first){title="";category="Movies";poster="";video="";description="";selectedCover=null;editId=""}
      loadMoviesAgain(::req){movies=it}
     }},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(editId.isBlank())"Upload Movie" else "Save Movie")}}
-    items(movies){m->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(m.title,color=Txt,fontWeight=FontWeight.Bold);Text(m.category,color=Muted,fontSize=10.sp);Row{
+    items(movies){m->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(m.title,color=Txt,fontWeight=FontWeight.Bold);Text(m.category+" • "+if(m.published)"Published" else "Pending",color=Muted,fontSize=10.sp);Row{
      TextButton(onClick={editId=m.id;title=m.title;category=m.category;poster=m.poster;video=m.video;selectedCover=null}){Text("Edit")}
-     TextButton(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_movies?id=eq."+m.id,JSONObject().put("is_trending",!m.trending).toString());status=if(r.first)"Trending setting updated" else r.second.take(100);load()}}){Text(if(m.trending)"Remove Trending" else "Set Trending")}\n     TextButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Movie deleted" else r.second.take(100);load()}}){Text("Delete",color=Color(0xFFFF8888))}
+     TextButton(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_movies?id=eq."+m.id,JSONObject().put("is_trending",!m.trending).toString());status=if(r.first)"Trending setting updated" else r.second.take(100);load()}}){Text(if(m.trending)"Remove Trending" else "Set Trending")}
+     TextButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Movie deleted" else r.second.take(100);load()}}){Text("Delete",color=Color(0xFFFF8888))}
     }}}}
    }
    "Audit"->LazyColumn{item{Text("Recent Admin Actions",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))};items(audit){x->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(x.action,color=Txt,fontWeight=FontWeight.Bold);Text(x.target,color=Muted,fontSize=10.sp);Text(x.created,color=Muted,fontSize=9.sp);Text(x.details,color=Muted,fontSize=9.sp,maxLines=3)}}}}
@@ -517,8 +514,8 @@ private data class AdminAudit(val action:String,val target:String,val created:St
  }
 }
 private suspend fun loadMoviesAgain(req:suspend (String,String,String?)->Pair<Boolean,String>,done:(List<AdminMovie>)->Unit){
- val r=req("GET","/rest/v1/zipmm_movies?select=id,title,category,video_url,poster_url&order=created_at.desc",null)
- if(r.first){val a=org.json.JSONArray(r.second);done((0 until a.length()).map{val j=a.getJSONObject(it);AdminMovie(j.optString("id"),j.optString("title"),j.optString("category"),j.optString("video_url"),j.optString("poster_url"))})}
+ val r=req("GET","/rest/v1/zipmm_movies?select=id,title,category,video_url,poster_url,is_published,is_trending&order=created_at.desc",null)
+ if(r.first){val a=org.json.JSONArray(r.second);done((0 until a.length()).map{val j=a.getJSONObject(it);AdminMovie(j.optString("id"),j.optString("title"),j.optString("category"),j.optString("video_url"),j.optString("poster_url"),j.optBoolean("is_published"),j.optBoolean("is_trending"))})}
 }
 private suspend fun saveZipmmSetting(key:String,value:Boolean,req:suspend (String,String,String?)->Pair<Boolean,String>,report:(String)->Unit){
  val r=req("POST","/rest/v1/rpc/zipmm_admin_save_setting",JSONObject().put("p_key",key).put("p_value",value).toString())
