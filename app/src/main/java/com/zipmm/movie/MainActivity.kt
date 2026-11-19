@@ -714,16 +714,50 @@ private fun supabaseAdminRequest(token:String,method:String,path:String,body:Str
 }
 private suspend fun authRequest(email:String,password:String,signup:Boolean):Pair<String?,String> = withContext(Dispatchers.IO){
  val key=BuildConfig.SUPABASE_PUBLISHABLE_KEY
- if(key.isBlank())return@withContext null to "Supabase Publishable Key ကို GitHub Secret ထဲမှာ ထည့်ရန်လိုပါတယ်။"
- try{
-  val path=if(signup)"/auth/v1/signup" else "/auth/v1/token?grant_type=password"
-  val c=URL(BuildConfig.SUPABASE_URL+path).openConnection() as HttpURLConnection
-  c.requestMethod="POST";c.connectTimeout=15000;c.readTimeout=15000;c.doOutput=true
-  c.setRequestProperty("apikey",key);c.setRequestProperty("Content-Type","application/json")
-  c.outputStream.use{it.write(JSONObject().put("email",email).put("password",password).toString().toByteArray())}
-  val code=c.responseCode;val body=(if(code in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:"{}"
-  val j=JSONObject(body)
-  if(code in 200..299){val access=j.optString("access_token","");if(access.isNotBlank())access to "OK" else null to "Email confirmation လိုအပ်နိုင်ပါတယ်။ Email ကိုအတည်ပြုပြီး Login ဝင်ပါ။"}
-  else null to j.optString("msg",j.optString("message",j.optString("error_description","Login မအောင်မြင်ပါ။")))
- }catch(e:Exception){null to "Connection error: "+e.localizedMessage}
+ if(key.isBlank())return@withContext null to "Supabase Publishable Key မရှိပါ။ GitHub Actions Secret ကိုစစ်ဆေးရန်လိုပါတယ်။"
+ val base=BuildConfig.SUPABASE_URL.trim().trimEnd('/')
+ if(!base.startsWith("https://") || base.contains("your-project",ignoreCase=true))
+  return@withContext null to "Supabase URL မမှန်ပါ။ App configuration ကိုစစ်ဆေးရန်လိုပါတယ်။"
+ val path=if(signup)"/auth/v1/signup" else "/auth/v1/token?grant_type=password"
+ var lastError:Exception?=null
+ repeat(2){attempt->
+  var c:HttpURLConnection?=null
+  try{
+   c=URL(base+path).openConnection() as HttpURLConnection
+   c.requestMethod="POST";c.connectTimeout=30000;c.readTimeout=30000;c.doOutput=true
+   c.instanceFollowRedirects=true
+   c.setRequestProperty("apikey",key);c.setRequestProperty("Content-Type","application/json; charset=utf-8")
+   c.setRequestProperty("Accept","application/json");c.setRequestProperty("Connection","close")
+   val payload=JSONObject().put("email",email.trim()).put("password",password).toString().toByteArray(Charsets.UTF_8)
+   c.setFixedLengthStreamingMode(payload.size)
+   c.outputStream.use{it.write(payload)}
+   val code=c.responseCode
+   val body=(if(code in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}?:"{}"
+   val j=try{JSONObject(body)}catch(_:Exception){JSONObject()}
+   if(code in 200..299){
+    val access=j.optString("access_token","")
+    if(access.isNotBlank())return@withContext access to "OK"
+    return@withContext null to "Email အတည်ပြုပြီးမှ Login ဝင်နိုင်ပါမယ်။ Inbox နဲ့ Spam ကိုစစ်ပါ။"
+   }
+   val msg=j.optString("msg",j.optString("message",j.optString("error_description",j.optString("error",""))))
+   return@withContext null to when {
+    code==400 && msg.contains("Invalid login credentials",true)->"Email သို့မဟုတ် Password မှားနေပါတယ်။"
+    code==400 && msg.contains("Email not confirmed",true)->"Email ကို အရင် Confirm လုပ်ပေးပါ။"
+    code==429->"Login ကြိုးစားမှုများလွန်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်စမ်းပါ။"
+    code>=500->"Supabase Server မှာ ယာယီပြဿနာရှိနေပါတယ်။ ခဏကြာမှ ပြန်စမ်းပါ။"
+    else->if(msg.isBlank())"Login မအောင်မြင်ပါ။ (HTTP $code)" else msg
+   }
+  }catch(e:Exception){
+   lastError=e
+   if(attempt==0)Thread.sleep(700)
+  }finally{c?.disconnect()}
+ }
+ val detail=when(lastError){
+  is java.net.UnknownHostException->"Internet/DNS က Supabase Server လိပ်စာကို မရှာနိုင်ပါ။ Wi-Fi သို့မဟုတ် Mobile Data ပြောင်းစမ်းပါ။"
+  is java.net.SocketTimeoutException->"Supabase Server တုံ့ပြန်ချိန်ကြာနေပါတယ်။ Network ပြောင်းပြီး ပြန်စမ်းပါ။"
+  is java.net.ConnectException->"ဖုန်းက Supabase Server ကို ချိတ်မရပါ။ VPN ပိတ်/ဖွင့် ပြောင်းစမ်းပါ သို့မဟုတ် Wi-Fi/Mobile Data ပြောင်းပါ။"
+  is javax.net.ssl.SSLException->"HTTPS လုံခြုံရေးချိတ်ဆက်မှု မအောင်မြင်ပါ။ ဖုန်း Date/Time နဲ့ Network ကိုစစ်ပါ။"
+  else->"Internet ချိတ်ဆက်မှု မအောင်မြင်ပါ။ Wi-Fi သို့မဟုတ် Mobile Data ပြောင်းပြီး ပြန်စမ်းပါ။"
+ }
+ null to detail
 }
