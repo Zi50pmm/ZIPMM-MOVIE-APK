@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="my">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080713">
+<title>ZIPMM MOVIE • Email Confirmation</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,#34205b 0,transparent 38%),linear-gradient(145deg,#080713,#111126 60%,#090812);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#fff}
+main{width:min(100%,440px);padding:34px 26px;border:1px solid #ffffff20;border-radius:26px;background:#171528eF;box-shadow:0 24px 80px #0008;text-align:center}
+.logo{width:62px;height:62px;margin:0 auto 18px;border-radius:19px;display:grid;place-items:center;background:linear-gradient(135deg,#c05bff,#7219c7);font-size:32px}
+h1{font-size:25px;margin:0 0 10px}p{color:#c6c1d5;line-height:1.7;margin:0 0 22px}.state{font-size:14px;color:#d9b5ff;margin-bottom:20px}
+a{display:inline-block;text-decoration:none;color:#fff;font-weight:700;background:linear-gradient(90deg,#8127d5,#a83fff);padding:13px 22px;border-radius:14px}
+.small{font-size:12px;color:#9993ad;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+ <div class="logo">▶</div>
+ <h1 id="title">ZIPMM MOVIE</h1>
+ <p id="message">အီးမေးလ်အတည်ပြုမှုကို စစ်ဆေးနေပါတယ်။ ခဏစောင့်ပေးပါ။</p>
+ <div class="state" id="state">Please wait…</div>
+ <a id="action" href="https://zi50pmm.github.io/ZIPMM-MOVIE-APK/">ZIPMM MOVIE သို့ ပြန်သွားရန်</a>
+ <div class="small">Watch • Download • Enjoy</div>
+</main>
+<script>
+(function(){
+ const p=new URLSearchParams(location.hash.replace(/^#/,""));
+ const type=p.get("type"), access=p.get("access_token"), error=p.get("error_description")||p.get("error");
+ const title=document.getElementById("title"), message=document.getElementById("message"), state=document.getElementById("state");
+ if(error){title.textContent="အတည်ပြုမှု မအောင်မြင်ပါ";message.textContent=decodeURIComponent(error.replace(/\+/g," "));state.textContent="Please try again or request a new confirmation email.";}
+ else if(access && type==="signup"){title.textContent="Email အတည်ပြုပြီးပါပြီ";message.textContent="သင့် ZIPMM MOVIE အကောင့်ကို အောင်မြင်စွာ အတည်ပြုပြီးပါပြီ။ App ကိုဖွင့်ပြီး Email နဲ့ Password ဖြင့် Login ဝင်နိုင်ပါပြီ။";state.textContent="✓ EMAIL CONFIRMED";}
+ else if(access){title.textContent="ZIPMM MOVIE";message.textContent="အတည်ပြုမှု ပြီးဆုံးပါပြီ။ App ထဲမှာ Login ဝင်ပါ။";state.textContent="✓ SUCCESS";}
+ else {title.textContent="ZIPMM MOVIE";message.textContent="Email အတည်ပြုလင့်မှ ဝင်လာပါက ဒီနေရာမှာ အတည်ပြုမှုရလဒ်ကို ပြပေးပါမယ်။";state.textContent="WELCOME";}
+ try{history.replaceState(null,document.title,location.pathname+location.search);}catch(e){}
+})();
+</script>
+</body>
+</html>
