@@ -164,6 +164,7 @@ class MainActivity:ComponentActivity(){
     "Search"->SearchPage(pad,query,movieCatalog,{query=it},{selected=it})
     "Category"->CategoryPage(pad,category,movieCatalog,{category=it},{selected=it})
     "VIP"->VipPage(pad,email,token,{page="Account"})
+    "Support"->SupportPage(pad,email,token)
     "Admin"->AdminControlPage(pad,token)
     "My List"->ListPage(pad,"My List",movieCatalog.filter{it.id in saved},{selected=it})
     "Downloads"->DownloadsPage(pad,prefs,{playing=it},{id->prefs.edit().remove("download_"+id).remove("download_title_"+id).apply()})
@@ -358,7 +359,8 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
  var resetBusy by remember{mutableStateOf(false)};var resetMessage by remember{mutableStateOf("")}
  Column(Modifier.fillMaxSize().padding(p).padding(20.dp)){Text("Account",color=Txt,fontSize=25.sp,fontWeight=FontWeight.Bold)
   if(token.isNotBlank()){Icon(Icons.Default.AccountCircle,null,tint=Purple2,modifier=Modifier.size(65.dp));Text(email,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("ZIPMM Member",color=Muted)
-   Button(onClick=openSupport,modifier=Modifier.fillMaxWidth().padding(top=14.dp)){Icon(Icons.Default.SupportAgent,null);Text(" Support / Priority Support")}\n   if(email.equals("flowerkingmyanmar@gmail.com",true)){Button(onClick=openAdmin,modifier=Modifier.fillMaxWidth().padding(top=18.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Default.AdminPanelSettings,null);Text(" Owner Admin Control")}}
+   Button(onClick=openSupport,modifier=Modifier.fillMaxWidth().padding(top=14.dp)){Icon(Icons.Default.SupportAgent,null);Text(" Support / Priority Support")}
+   if(email.equals("flowerkingmyanmar@gmail.com",true)){Button(onClick=openAdmin,modifier=Modifier.fillMaxWidth().padding(top=18.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Icon(Icons.Default.AdminPanelSettings,null);Text(" Owner Admin Control")}}
    Button(onClick=logout,modifier=Modifier.fillMaxWidth().padding(top=12.dp)){Text("Log Out")}}
   else if(resetMode){
    Text("Forgot Password",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
@@ -388,7 +390,8 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
 private data class AdminPayment(val id:String,val userId:String,val plan:String,val amount:Int,val method:String,val reference:String)
 private data class AdminUser(val id:String,val email:String,val banned:String)
 private data class AdminMovie(val id:String,val title:String,val category:String,val video:String,val poster:String,val published:Boolean,val trending:Boolean)
-private data class AdminAudit(val action:String,val target:String,val created:String,val details:String)\nprivate data class AdminTicket(val id:String,val userId:String,val subject:String,val message:String,val priority:Boolean,val status:String)
+private data class AdminAudit(val action:String,val target:String,val created:String,val details:String)
+private data class AdminTicket(val id:String,val userId:String,val subject:String,val message:String,val priority:Boolean,val status:String)
 
 @Composable private fun AdminControlPage(p:PaddingValues,token:String){
  val scope= rememberCoroutineScope()
@@ -399,9 +402,11 @@ private data class AdminAudit(val action:String,val target:String,val created:St
  var payments by remember{mutableStateOf<List<AdminPayment>>(emptyList())}
  var users by remember{mutableStateOf<List<AdminUser>>(emptyList())}
  var movies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}
- var pendingMovies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}\n var kbzNumber by remember{mutableStateOf("")};var kbzName by remember{mutableStateOf("")}
+ var pendingMovies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}
+ var kbzNumber by remember{mutableStateOf("")};var kbzName by remember{mutableStateOf("")}
  var waveNumber by remember{mutableStateOf("")};var waveName by remember{mutableStateOf("")}
- var audit by remember{mutableStateOf<List<AdminAudit>>(emptyList())}\n var tickets by remember{mutableStateOf<List<AdminTicket>>(emptyList())}
+ var audit by remember{mutableStateOf<List<AdminAudit>>(emptyList())}
+ var tickets by remember{mutableStateOf<List<AdminTicket>>(emptyList())}
  var title by remember{mutableStateOf("")};var category by remember{mutableStateOf("Movies")}
  var video by remember{mutableStateOf("")};var poster by remember{mutableStateOf("")};var description by remember{mutableStateOf("")}
  var selectedCover by remember{mutableStateOf<Uri?>(null)}
@@ -421,7 +426,8 @@ private data class AdminAudit(val action:String,val target:String,val created:St
    "Movies"->{val r=req("GET","/rest/v1/zipmm_movies?select=id,title,category,video_url,poster_url,is_published,is_trending&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);movies=(0 until j.length()).map{val x=j.getJSONObject(it);AdminMovie(x.optString("id"),x.optString("title"),x.optString("category"),x.optString("video_url"),x.optString("poster_url"),x.optBoolean("is_published"),x.optBoolean("is_trending"))}}else status=r.second.take(130)}
    "Pending"->{val r=req("GET","/rest/v1/zipmm_movies?is_published=eq.false&select=id,title,category,video_url,poster_url,is_published,is_trending&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);pendingMovies=(0 until j.length()).map{val x=j.getJSONObject(it);AdminMovie(x.optString("id"),x.optString("title"),x.optString("category"),x.optString("video_url"),x.optString("poster_url"),false,x.optBoolean("is_trending"))}}else status=r.second.take(130)}
    "VIP Payments"->{val r=req("GET","/rest/v1/zipmm_vip_payments?status=eq.pending&select=id,user_id,plan,amount_mmk,payment_method,transaction_reference&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);payments=(0 until j.length()).map{val x=j.getJSONObject(it);AdminPayment(x.optString("id"),x.optString("user_id"),x.optString("plan"),x.optInt("amount_mmk"),x.optString("payment_method"),x.optString("transaction_reference"))}}else status=r.second.take(130)}
-   "Support"->{val r=req("GET","/rest/v1/zipmm_support_tickets?select=id,user_id,subject,message,priority,status&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);tickets=(0 until j.length()).map{val x=j.getJSONObject(it);AdminTicket(x.optString("id"),x.optString("user_id"),x.optString("subject"),x.optString("message"),x.optBoolean("priority"),x.optString("status"))}}else status=r.second.take(120)}\n   "Audit"->{val r=req("GET","/rest/v1/zipmm_admin_audit?select=action,target_type,target_id,created_at,details&order=created_at.desc&limit=100");if(r.first){val j=org.json.JSONArray(r.second);audit=(0 until j.length()).map{val x=j.getJSONObject(it);AdminAudit(x.optString("action"),x.optString("target_type")+" "+x.optString("target_id"),x.optString("created_at"),x.optString("details"))}}else status=r.second.take(120)}
+   "Support"->{val r=req("GET","/rest/v1/zipmm_support_tickets?select=id,user_id,subject,message,priority,status&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);tickets=(0 until j.length()).map{val x=j.getJSONObject(it);AdminTicket(x.optString("id"),x.optString("user_id"),x.optString("subject"),x.optString("message"),x.optBoolean("priority"),x.optString("status"))}}else status=r.second.take(120)}
+   "Audit"->{val r=req("GET","/rest/v1/zipmm_admin_audit?select=action,target_type,target_id,created_at,details&order=created_at.desc&limit=100");if(r.first){val j=org.json.JSONArray(r.second);audit=(0 until j.length()).map{val x=j.getJSONObject(it);AdminAudit(x.optString("action"),x.optString("target_type")+" "+x.optString("target_id"),x.optString("created_at"),x.optString("details"))}}else status=r.second.take(120)}
    "Settings"->{val r=req("GET","/rest/v1/zipmm_app_settings?select=setting_key,setting_value");if(r.first){val j=org.json.JSONArray(r.second);for(i in 0 until j.length()){val x=j.getJSONObject(i);when(x.optString("setting_key")){"maintenance_mode"->maintenance=x.opt("setting_value").toString()=="true";"registration_enabled"->registration=x.opt("setting_value").toString()=="true";"vip_enabled"->vipEnabled=x.opt("setting_value").toString()=="true";"kbzpay_account"->{val v=x.optJSONObject("setting_value");kbzNumber=v?.optString("number","")?: "";kbzName=v?.optString("name","")?: ""};"wavepay_account"->{val v=x.optJSONObject("setting_value");waveNumber=v?.optString("number","")?: "";waveName=v?.optString("name","")?: ""}}}}else status=r.second.take(130)}
   }
   if(status.startsWith("Owner Admin")||status.startsWith("Admin ခွင့်မရှိ"))status=if(isOwner)"Owner Super Admin ခွင့်ပြုချက်ရရှိပါသည်။" else "Admin ခွင့်ပြုချက်ရရှိပါသည်။"
@@ -440,7 +446,8 @@ private data class AdminAudit(val action:String,val target:String,val created:St
     item{AdminActionCard("Users","User စာရင်း၊ Block / Unblock / Delete","OPEN"){tab="Users"}}
     item{AdminActionCard("Movies","Movie ထည့်၊ ပြင်၊ ဖျက်ရန်","OPEN"){tab="Movies"}}
     item{AdminActionCard("Pending Approval","အတည်ပြုရန် စောင့်နေသော Movie များ","OPEN"){tab="Pending"}}
-    item{AdminActionCard("VIP Payments","KBZPay / WavePay စစ်ဆေးရန်","OPEN"){tab="VIP Payments"}}\n    item{AdminActionCard("Support","User အကူအညီတောင်းခံမှုများ","OPEN"){tab="Support"}}
+    item{AdminActionCard("VIP Payments","KBZPay / WavePay စစ်ဆေးရန်","OPEN"){tab="VIP Payments"}}
+    item{AdminActionCard("Support","User အကူအညီတောင်းခံမှုများ","OPEN"){tab="Support"}}
     item{AdminActionCard("App Settings","Maintenance၊ Registration၊ VIP","OPEN"){tab="Settings"}}
     item{AdminActionCard("Audit Log","Admin လုပ်ဆောင်ချက်မှတ်တမ်း","OPEN"){tab="Audit"}}
     item{if(isOwner)Text("Owner သာ Admin ခန့်ခြင်း၊ User ဖျက်ခြင်းနှင့် App Settings ပြောင်းခြင်း ပြုလုပ်နိုင်သည်။",color=Color(0xFFFFD36B),fontSize=11.sp,modifier=Modifier.padding(12.dp))}
@@ -449,7 +456,8 @@ private data class AdminAudit(val action:String,val target:String,val created:St
     item{Text("Pending Movies: "+pendingMovies.size,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
     if(pendingMovies.isEmpty())item{Text("အတည်ပြုရန် Movie မရှိသေးပါ။",color=Muted,modifier=Modifier.padding(14.dp))}
     items(pendingMovies){m->Card(Modifier.fillMaxWidth().padding(5.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(12.dp)){Text(m.title,color=Txt,fontWeight=FontWeight.Bold);Text(m.category,color=Muted,fontSize=11.sp);Row{Button(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_movies?id=eq."+m.id,JSONObject().put("is_published",true).toString());status=if(r.first)"Movie approved and published" else r.second.take(120);load()}},colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text("Approve")} ; OutlinedButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Pending movie deleted" else r.second.take(120);load()}}){Text("Reject / Delete")}}}}}
-   }\n   "VIP Payments"->LazyColumn{
+   }
+   "VIP Payments"->LazyColumn{
     item{Text("Pending Payments: "+payments.size,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
     items(payments){x->Card(Modifier.fillMaxWidth().padding(5.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(12.dp)){
      Text(x.plan+" • "+x.amount+" MMK",color=Txt,fontWeight=FontWeight.Bold);Text(x.method+" • Ref: "+x.reference,color=Muted,fontSize=11.sp);Text("User: "+x.userId,color=Muted,fontSize=9.sp)
@@ -510,7 +518,8 @@ private data class AdminAudit(val action:String,val target:String,val created:St
      TextButton(onClick={scope.launch{val r=req("DELETE","/rest/v1/zipmm_movies?id=eq."+m.id);status=if(r.first)"Movie deleted" else r.second.take(100);load()}}){Text("Delete",color=Color(0xFFFF8888))}
     }}}}
    }
-   "Support"->LazyColumn{item{Text("Support Requests: "+tickets.size,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))};items(tickets){t->Card(Modifier.fillMaxWidth().padding(5.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(12.dp)){Text((if(t.priority)"★ PRIORITY • " else "")+t.subject,color=if(t.priority)Color(0xFFFFD36B) else Txt,fontWeight=FontWeight.Bold);Text(t.message,color=Muted,fontSize=12.sp);Text("User: "+t.userId+" • "+t.status,color=Muted,fontSize=10.sp);Row{OutlinedButton(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_support_tickets?id=eq."+t.id,JSONObject().put("status","in_progress").toString());status=if(r.first)"Ticket marked in progress" else r.second.take(100);load()}}){Text("In Progress")};Button(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_support_tickets?id=eq."+t.id,JSONObject().put("status","closed").toString());status=if(r.first)"Ticket closed" else r.second.take(100);load()}}){Text("Close")}}}}}}\n   "Audit"->LazyColumn{item{Text("Recent Admin Actions",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))};items(audit){x->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(x.action,color=Txt,fontWeight=FontWeight.Bold);Text(x.target,color=Muted,fontSize=10.sp);Text(x.created,color=Muted,fontSize=9.sp);Text(x.details,color=Muted,fontSize=9.sp,maxLines=3)}}}}
+   "Support"->LazyColumn{item{Text("Support Requests: "+tickets.size,color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))};items(tickets){t->Card(Modifier.fillMaxWidth().padding(5.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(12.dp)){Text((if(t.priority)"★ PRIORITY • " else "")+t.subject,color=if(t.priority)Color(0xFFFFD36B) else Txt,fontWeight=FontWeight.Bold);Text(t.message,color=Muted,fontSize=12.sp);Text("User: "+t.userId+" • "+t.status,color=Muted,fontSize=10.sp);Row{OutlinedButton(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_support_tickets?id=eq."+t.id,JSONObject().put("status","in_progress").toString());status=if(r.first)"Ticket marked in progress" else r.second.take(100);load()}}){Text("In Progress")};Button(onClick={scope.launch{val r=req("PATCH","/rest/v1/zipmm_support_tickets?id=eq."+t.id,JSONObject().put("status","closed").toString());status=if(r.first)"Ticket closed" else r.second.take(100);load()}}){Text("Close")}}}}}}
+   "Audit"->LazyColumn{item{Text("Recent Admin Actions",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))};items(audit){x->Card(Modifier.fillMaxWidth().padding(4.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(10.dp)){Text(x.action,color=Txt,fontWeight=FontWeight.Bold);Text(x.target,color=Muted,fontSize=10.sp);Text(x.created,color=Muted,fontSize=9.sp);Text(x.details,color=Muted,fontSize=9.sp,maxLines=3)}}}}
    "Settings"->LazyColumn{
     item{Text("App Settings",color=Txt,fontSize=19.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(12.dp))}
     item{Setting("Maintenance Mode","App maintenance on/off",maintenance){v->maintenance=v;scope.launch{saveZipmmSetting("maintenance_mode",v,::req){status=it}}}}
