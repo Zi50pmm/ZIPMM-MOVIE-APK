@@ -188,7 +188,7 @@ class MainActivity:ComponentActivity(){
    IconButton(onClick=onSearch){Icon(Icons.Default.Search,null,tint=Txt)}
    IconButton(onClick={onCategory("Settings")}){Icon(Icons.Default.Settings,null,tint=Txt)}
   }}
-  item{movies.firstOrNull{it.isTrending}?.let{featured->Hero(featured){onMovie(featured)}} ?: movies.firstOrNull()?.let{featured->Hero(featured){onMovie(featured)}}}
+  item{movies.firstOrNull{it.isTrending}?.let{featured->Hero(featured){onMovie(featured)}}}
   item{LazyRow(contentPadding=PaddingValues(horizontal=12.dp),horizontalArrangement=Arrangement.spacedBy(9.dp),modifier=Modifier.padding(top=15.dp)){
    items(listOf("Movies","Series","Anime","Cartoon","Favorites","VIP")){name->
     Column(Modifier.width(66.dp).clickable{onCategory(if(name=="Favorites")"My List" else name)},horizontalAlignment=Alignment.CenterHorizontally){
