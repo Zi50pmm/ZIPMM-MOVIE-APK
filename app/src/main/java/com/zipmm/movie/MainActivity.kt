@@ -689,7 +689,7 @@ private fun supabaseAdminRequest(token:String,method:String,path:String,body:Str
     if(r.first)reference=""
    }},enabled=!submitting,modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(submitting)"တင်သွင်းနေသည်..." else "ငွေလွှဲအတည်ပြုရန် တင်မည်")}
    if(status.isNotBlank())Text(status,color=Purple2,fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
-  }}
+  }}}
   item{Text("ငွေလွှဲပြီးနောက် Transaction နံပါတ် ၅ လုံးကို မှန်ကန်စွာ ဖြည့်ပါ။ Admin အတည်ပြုပြီးမှ VIP အသင်းဝင်ဖြစ်ပါမည်။",color=Muted,fontSize=11.sp,modifier=Modifier.padding(horizontal=18.dp))}
  }
 }
