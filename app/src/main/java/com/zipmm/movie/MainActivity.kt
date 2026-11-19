@@ -399,7 +399,8 @@ private data class AdminAudit(val action:String,val target:String,val created:St
  var payments by remember{mutableStateOf<List<AdminPayment>>(emptyList())}
  var users by remember{mutableStateOf<List<AdminUser>>(emptyList())}
  var movies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}
- var pendingMovies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}\n var kbzNumber by remember{mutableStateOf("")};var kbzName by remember{mutableStateOf("")}\n var waveNumber by remember{mutableStateOf("")};var waveName by remember{mutableStateOf("")}
+ var pendingMovies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}\n var kbzNumber by remember{mutableStateOf("")};var kbzName by remember{mutableStateOf("")}
+ var waveNumber by remember{mutableStateOf("")};var waveName by remember{mutableStateOf("")}
  var audit by remember{mutableStateOf<List<AdminAudit>>(emptyList())}
  var title by remember{mutableStateOf("")};var category by remember{mutableStateOf("Movies")}
  var video by remember{mutableStateOf("")};var poster by remember{mutableStateOf("")};var description by remember{mutableStateOf("")}
