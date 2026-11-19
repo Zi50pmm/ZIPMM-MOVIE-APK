@@ -163,7 +163,7 @@ class MainActivity:ComponentActivity(){
     },{selected=it})
     "Search"->SearchPage(pad,query,movieCatalog,{query=it},{selected=it})
     "Category"->CategoryPage(pad,category,movieCatalog,{category=it},{selected=it})
-    "VIP"->VipPage(pad,email.isNotBlank(),{page="Account"})
+    "VIP"->VipPage(pad,email,token,{page="Account"})
     "Admin"->AdminControlPage(pad,token)
     "My List"->ListPage(pad,"My List",movieCatalog.filter{it.id in saved},{selected=it})
     "Downloads"->DownloadsPage(pad,prefs,{playing=it},{id->prefs.edit().remove("download_"+id).remove("download_title_"+id).apply()})
@@ -399,7 +399,7 @@ private data class AdminAudit(val action:String,val target:String,val created:St
  var payments by remember{mutableStateOf<List<AdminPayment>>(emptyList())}
  var users by remember{mutableStateOf<List<AdminUser>>(emptyList())}
  var movies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}
- var pendingMovies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}\n var markTrending by remember{mutableStateOf(false)}
+ var pendingMovies by remember{mutableStateOf<List<AdminMovie>>(emptyList())}\n var kbzNumber by remember{mutableStateOf("")};var kbzName by remember{mutableStateOf("")}\n var waveNumber by remember{mutableStateOf("")};var waveName by remember{mutableStateOf("")}
  var audit by remember{mutableStateOf<List<AdminAudit>>(emptyList())}
  var title by remember{mutableStateOf("")};var category by remember{mutableStateOf("Movies")}
  var video by remember{mutableStateOf("")};var poster by remember{mutableStateOf("")};var description by remember{mutableStateOf("")}
@@ -421,7 +421,7 @@ private data class AdminAudit(val action:String,val target:String,val created:St
    "Pending"->{val r=req("GET","/rest/v1/zipmm_movies?is_published=eq.false&select=id,title,category,video_url,poster_url,is_published,is_trending&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);pendingMovies=(0 until j.length()).map{val x=j.getJSONObject(it);AdminMovie(x.optString("id"),x.optString("title"),x.optString("category"),x.optString("video_url"),x.optString("poster_url"),false,x.optBoolean("is_trending"))}}else status=r.second.take(130)}
    "VIP Payments"->{val r=req("GET","/rest/v1/zipmm_vip_payments?status=eq.pending&select=id,user_id,plan,amount_mmk,payment_method,transaction_reference&order=created_at.desc");if(r.first){val j=org.json.JSONArray(r.second);payments=(0 until j.length()).map{val x=j.getJSONObject(it);AdminPayment(x.optString("id"),x.optString("user_id"),x.optString("plan"),x.optInt("amount_mmk"),x.optString("payment_method"),x.optString("transaction_reference"))}}else status=r.second.take(130)}
    "Audit"->{val r=req("GET","/rest/v1/zipmm_admin_audit?select=action,target_type,target_id,created_at,details&order=created_at.desc&limit=100");if(r.first){val j=org.json.JSONArray(r.second);audit=(0 until j.length()).map{val x=j.getJSONObject(it);AdminAudit(x.optString("action"),x.optString("target_type")+" "+x.optString("target_id"),x.optString("created_at"),x.optString("details"))}}else status=r.second.take(120)}
-   "Settings"->{val r=req("GET","/rest/v1/zipmm_app_settings?select=setting_key,setting_value");if(r.first){val j=org.json.JSONArray(r.second);for(i in 0 until j.length()){val x=j.getJSONObject(i);when(x.optString("setting_key")){"maintenance_mode"->maintenance=x.opt("setting_value").toString()=="true";"registration_enabled"->registration=x.opt("setting_value").toString()=="true";"vip_enabled"->vipEnabled=x.opt("setting_value").toString()=="true"}}}else status=r.second.take(130)}
+   "Settings"->{val r=req("GET","/rest/v1/zipmm_app_settings?select=setting_key,setting_value");if(r.first){val j=org.json.JSONArray(r.second);for(i in 0 until j.length()){val x=j.getJSONObject(i);when(x.optString("setting_key")){"maintenance_mode"->maintenance=x.opt("setting_value").toString()=="true";"registration_enabled"->registration=x.opt("setting_value").toString()=="true";"vip_enabled"->vipEnabled=x.opt("setting_value").toString()=="true";"kbzpay_account"->{val v=x.optJSONObject("setting_value");kbzNumber=v?.optString("number","")?: "";kbzName=v?.optString("name","")?: ""};"wavepay_account"->{val v=x.optJSONObject("setting_value");waveNumber=v?.optString("number","")?: "";waveName=v?.optString("name","")?: ""}}}}else status=r.second.take(130)}
   }
   if(status.startsWith("Owner Admin")||status.startsWith("Admin ခွင့်မရှိ"))status=if(isOwner)"Owner Super Admin ခွင့်ပြုချက်ရရှိပါသည်။" else "Admin ခွင့်ပြုချက်ရရှိပါသည်။"
   loading=false
@@ -515,6 +515,14 @@ private data class AdminAudit(val action:String,val target:String,val created:St
     item{Setting("Maintenance Mode","App maintenance on/off",maintenance){v->maintenance=v;scope.launch{saveZipmmSetting("maintenance_mode",v,::req){status=it}}}}
     item{Setting("Registration","Allow new accounts",registration){v->registration=v;scope.launch{saveZipmmSetting("registration_enabled",v,::req){status=it}}}}
     item{Setting("VIP Membership","VIP purchase enable/disable",vipEnabled){v->vipEnabled=v;scope.launch{saveZipmmSetting("vip_enabled",v,::req){status=it}}}}
+    item{Text("KBZPay ငွေလက်ခံအကောင့်",color=Txt,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=16.dp))}
+    item{OutlinedTextField(kbzNumber,{kbzNumber=it},modifier=Modifier.fillMaxWidth(),label={Text("KBZPay ဖုန်းနံပါတ်")},singleLine=true)}
+    item{OutlinedTextField(kbzName,{kbzName=it},modifier=Modifier.fillMaxWidth(),label={Text("အကောင့်အမည်")},singleLine=true)}
+    item{Button(onClick={scope.launch{val v=JSONObject().put("number",kbzNumber.trim()).put("name",kbzName.trim());val r=req("POST","/rest/v1/rpc/zipmm_admin_save_setting",JSONObject().put("p_key","kbzpay_account").put("p_value",v).toString());status=if(r.first)"KBZPay account saved" else r.second.take(100)}},enabled=isOwner,modifier=Modifier.fillMaxWidth()){Text("KBZPay အချက်အလက် သိမ်းမည်")}}
+    item{Text("WavePay ငွေလက်ခံအကောင့်",color=Txt,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=16.dp))}
+    item{OutlinedTextField(waveNumber,{waveNumber=it},modifier=Modifier.fillMaxWidth(),label={Text("WavePay ဖုန်းနံပါတ်")},singleLine=true)}
+    item{OutlinedTextField(waveName,{waveName=it},modifier=Modifier.fillMaxWidth(),label={Text("အကောင့်အမည်")},singleLine=true)}
+    item{Button(onClick={scope.launch{val v=JSONObject().put("number",waveNumber.trim()).put("name",waveName.trim());val r=req("POST","/rest/v1/rpc/zipmm_admin_save_setting",JSONObject().put("p_key","wavepay_account").put("p_value",v).toString());status=if(r.first)"WavePay account saved" else r.second.take(100)}},enabled=isOwner,modifier=Modifier.fillMaxWidth()){Text("WavePay အချက်အလက် သိမ်းမည်")}}
     item{if(!isOwner)Text("Setting ပြောင်းလဲခွင့် Owner သာရှိသည်။",color=Muted,fontSize=11.sp)}
    }
   }
@@ -595,67 +603,63 @@ private fun supabaseAdminRequest(token:String,method:String,path:String,body:Str
  }catch(e:Exception){false to (e.localizedMessage?: "Network error")}
 }
 
-@Composable private fun VipPage(p:PaddingValues,isSignedIn:Boolean,openAccount:()->Unit){
+@Composable private fun VipPage(p:PaddingValues,email:String,token:String,openAccount:()->Unit){
  var plan by remember{mutableStateOf("1 Month")}
  var payment by remember{mutableStateOf("KBZPay")}
- var showInfo by remember{mutableStateOf(false)}
+ var reference by remember{mutableStateOf("")}
+ var accountNumber by remember{mutableStateOf("")}
+ var accountName by remember{mutableStateOf("")}
+ var submitting by remember{mutableStateOf(false)}
+ var status by remember{mutableStateOf("")}
+ val scope= rememberCoroutineScope()
+ LaunchedEffect(payment){
+  val key=if(payment=="KBZPay")"kbzpay_account" else "wavepay_account"
+  val r=withContext(Dispatchers.IO){supabasePublicRequest("/rest/v1/zipmm_app_settings?setting_key=eq."+key+"&select=setting_value")}
+  if(r.first){val a=org.json.JSONArray(r.second);if(a.length()>0){val v=a.getJSONObject(0).optJSONObject("setting_value");accountNumber=v?.optString("number","")?:"";accountName=v?.optString("name","")?:""}else{accountNumber="";accountName=""}}
+ }
  LazyColumn(Modifier.fillMaxSize().padding(p),contentPadding=PaddingValues(bottom=28.dp)){
   item{Box(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(26.dp)).background(Brush.linearGradient(listOf(Color(0xFF4B2382),Color(0xFF171126),Color(0xFFB77925)))).padding(22.dp)){
-   Column{
-    Row(verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.WorkspacePremium,null,tint=Color(0xFFFFD36B),modifier=Modifier.size(34.dp));Text(" ZIPMM VIP",color=Color(0xFFFFD36B),fontSize=25.sp,fontWeight=FontWeight.Black)}
+   Column{Row(verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.WorkspacePremium,null,tint=Color(0xFFFFD36B),modifier=Modifier.size(34.dp));Text(" ZIPMM VIP",color=Color(0xFFFFD36B),fontSize=25.sp,fontWeight=FontWeight.Black)}
     Text("GO BEYOND THE SCREEN",color=Txt,fontSize=11.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=7.dp))
-    Text("Your movie world. Without limits.",color=Txt,fontSize=19.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=14.dp))
-    Text("VIP အဖွဲ့ဝင်များအတွက် အထူးအခွင့်အရေးများ",color=Color(0xFFE3D8F2),fontSize=13.sp,modifier=Modifier.padding(top=5.dp))
+    Text("သင့်ရုပ်ရှင်အတွေ့အကြုံကို ပိုမိုကောင်းမွန်စေပါ",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=14.dp))
    }
   }}
-  item{Card(Modifier.fillMaxWidth().padding(horizontal=16.dp),colors=CardDefaults.cardColors(containerColor=Panel),shape=RoundedCornerShape(18.dp)){
-   Row(Modifier.padding(16.dp),verticalAlignment=Alignment.CenterVertically){
-    Icon(Icons.Default.VerifiedUser,null,tint=Color(0xFFFFD36B),modifier=Modifier.size(30.dp))
-    Column(Modifier.weight(1f).padding(start=12.dp)){Text("Membership Status",color=Muted,fontSize=11.sp);Text("STANDARD MEMBER",color=Txt,fontWeight=FontWeight.Bold,fontSize=16.sp)}
-    Text("NOT ACTIVE",color=Color(0xFFFFC857),fontSize=10.sp,fontWeight=FontWeight.Black,modifier=Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFF47351B)).padding(horizontal=10.dp,vertical=7.dp))
-   }
-  }}
-  item{Text("VIP အထူးအခွင့်အရေးများ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=24.dp,bottom=12.dp))}
+  item{Text("VIP အထူးအခွင့်အရေးများ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=18.dp,bottom=12.dp))}
   item{Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){
    VipBenefit(Icons.Default.Hd,"HD / Full HD Quality","ရုပ်ရှင်အရည်အသွေးမြင့်ဖြင့် ကြည့်ရှုနိုင်ရန်")
-   VipBenefit(Icons.Default.Block,"Ad-Free Experience","ကြော်ငြာမပါဘဲ အနှောင့်အယှက်ကင်းစွာ")
-   VipBenefit(Icons.Default.Download,"Priority Downloads","Download လုပ်ရာတွင် VIP အထူးဦးစားပေး")
-   VipBenefit(Icons.Default.Star,"VIP Exclusive Movies","VIP သီးသန့်ရုပ်ရှင်များကို ဝင်ရောက်ကြည့်ရှုခွင့်")
-   VipBenefit(Icons.Default.SupportAgent,"Priority Support","အကူအညီတောင်းခံမှု ဦးစားပေးဝန်ဆောင်မှု")
+   VipBenefit(Icons.Default.Block,"Ad-Free Experience","ကြော်ငြာမပါဘဲ ကြည့်ရှုနိုင်ရန်")
+   VipBenefit(Icons.Default.Download,"Priority Downloads","Download ဦးစားပေးဝန်ဆောင်မှု")
+   VipBenefit(Icons.Default.Star,"VIP Exclusive Movies","VIP သီးသန့်ရုပ်ရှင်များ")
+   VipBenefit(Icons.Default.SupportAgent,"Priority Support","အကူအညီတောင်းခံမှုကို ဦးစားပေးဖြေရှင်းပေးရန်")
   }}
-  item{Text("သင့် Membership Plan ကိုရွေးချယ်ပါ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=25.dp,bottom=12.dp))}
-  item{Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-   listOf("1 Month","3 Months").forEachIndexed{index,name->
-    val desc=listOf("လစဉ် VIP အသင်းဝင်","၃ လစာ VIP အသင်းဝင်")[index]
-    val chosen=plan==name
-    Card(Modifier.fillMaxWidth().clickable{plan=name},colors=CardDefaults.cardColors(containerColor=if(chosen)Color(0xFF302044) else Panel),border=if(chosen)androidx.compose.foundation.BorderStroke(1.dp,Purple2) else null,shape=RoundedCornerShape(15.dp)){
-     Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){
-      RadioButton(chosen,{plan=name},colors=RadioButtonDefaults.colors(selectedColor=Purple2))
-      Column(Modifier.weight(1f).padding(start=8.dp)){Text(name,color=Txt,fontWeight=FontWeight.Bold,fontSize=16.sp);Text(desc,color=Muted,fontSize=11.sp)}
-      Text(if(name=="1 Month")"3,000 ကျပ်" else "8,000 ကျပ်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold,fontSize=14.sp)
-     }
-    }
-   }
+  item{Text("VIP Plan ရွေးချယ်ပါ",color=Txt,fontSize=20.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=24.dp,bottom=10.dp))}
+  item{Column(Modifier.padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+   listOf("1 Month","3 Months").forEach{name->val chosen=plan==name;Card(Modifier.fillMaxWidth().clickable{plan=name},colors=CardDefaults.cardColors(containerColor=if(chosen)Color(0xFF302044) else Panel),border=if(chosen)androidx.compose.foundation.BorderStroke(1.dp,Purple2) else null){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){RadioButton(chosen,{plan=name});Column(Modifier.weight(1f)){Text(name,color=Txt,fontWeight=FontWeight.Bold);Text(if(name=="1 Month")"၁ လစာ" else "၃ လစာ",color=Muted,fontSize=11.sp)};Text(if(name=="1 Month")"3,000 ကျပ်" else "8,000 ကျပ်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold)}}}
   }}
-  item{Text("ငွေပေးချေမည့်နည်းလမ်း",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=23.dp,bottom=10.dp))}
-  item{Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(10.dp)){
-   listOf("KBZPay","WavePay").forEach{method->
-    val chosen=payment==method
-    OutlinedButton(onClick={payment=method},modifier=Modifier.weight(1f),colors=ButtonDefaults.outlinedButtonColors(contentColor=if(chosen)Purple2 else Txt),border=androidx.compose.foundation.BorderStroke(if(chosen)2.dp else 1.dp,if(chosen)Purple2 else Muted)){
-     Icon(if(method=="KBZPay")Icons.Default.AccountBalanceWallet else Icons.Default.Payments,null);Text(" $method")
-    }
-   }
+  item{Text("ငွေပေးချေမှုနည်းလမ်း",color=Txt,fontSize=18.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(start=18.dp,top=22.dp,bottom=10.dp))}
+  item{Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf("KBZPay","WavePay").forEach{m->FilterChip(selected=payment==m,onClick={payment=m},label={Text(m)})}}}
+  item{Card(Modifier.fillMaxWidth().padding(16.dp),colors=CardDefaults.cardColors(containerColor=Panel)){Column(Modifier.padding(16.dp)){
+   Text("ငွေလွှဲရန် အကောင့်",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold)
+   Text(if(accountNumber.isBlank())"Admin မှ $payment လက်ခံဖုန်းနံပါတ် မသတ်မှတ်ရသေးပါ။" else "$payment: $accountNumber\nအမည်: $accountName",color=Txt,fontSize=14.sp,modifier=Modifier.padding(top=8.dp))
+   Text("ကျသင့်ငွေ: ${if(plan=="1 Month")"3,000" else "8,000"} ကျပ်",color=Txt,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=12.dp))
+   OutlinedTextField(reference,{reference=it.filter{ch->ch.isDigit()}.take(5)},modifier=Modifier.fillMaxWidth().padding(top=12.dp),label={Text("ငွေလွှဲ Transaction နံပါတ် (၅ လုံး)")},singleLine=true)
+   Button(onClick={scope.launch{
+    if(token.isBlank()){status="VIP ဝယ်ယူရန် အကောင့် Login ဝင်ပါ။";return@launch}
+    if(accountNumber.isBlank()){status="Admin က ငွေလက်ခံအကောင့်ကို အရင်သတ်မှတ်ပေးရန်လိုသည်။";return@launch}
+    if(!reference.matches(Regex("[0-9]{5}"))){status="ငွေလွှဲနံပါတ် ၅ လုံးတိတိ ထည့်ပါ။";return@launch}
+    submitting=true;status="တင်သွင်းနေသည်..."
+    val subject=try{val payload=token.split(".")[1];JSONObject(String(Base64.decode(payload,Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING))).optString("sub","")}catch(_:Exception){""}
+    if(subject.isBlank()){submitting=false;status="Login သက်တမ်းကုန်နေပါသည်။ ပြန်ဝင်ပါ။";return@launch}
+    val amount=if(plan=="1 Month")3000 else 8000
+    val body=JSONObject().put("user_id",subject).put("plan",plan).put("amount_mmk",amount).put("payment_method",payment).put("transaction_reference",reference).put("receipt_path","manual-reference").put("status","pending").toString()
+    val r=withContext(Dispatchers.IO){supabaseAdminRequest(token,"POST","/rest/v1/zipmm_vip_payments",body)}
+    submitting=false;status=if(r.first)"ငွေပေးချေမှု အထောက်အထား တင်ပြီးပါပြီ။ Admin စစ်ဆေးနေပါသည်။" else "တင်မရပါ: "+r.second.take(150)
+    if(r.first)reference=""
+   }},enabled=!submitting,modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(submitting)"တင်သွင်းနေသည်..." else "ငွေလွှဲအတည်ပြုရန် တင်မည်")}
+   if(status.isNotBlank())Text(status,color=Purple2,fontSize=12.sp,modifier=Modifier.padding(top=10.dp))
   }}
-  item{Card(Modifier.fillMaxWidth().padding(16.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFF211A2E)),shape=RoundedCornerShape(15.dp)){
-   Column(Modifier.padding(15.dp)){
-    Text("VIP ဈေးနှုန်း",color=Color(0xFFFFD36B),fontWeight=FontWeight.Bold)
-    Text("ရွေးချယ်ထားသော Plan: $plan\nကျသင့်ငွေ: ${if(plan=="1 Month")"3,000 ကျပ်" else "8,000 ကျပ်"}\nPayment: $payment\n\nKBZPay / WavePay Merchant ချိတ်ဆက်မှုနှင့် ငွေလွှဲအထောက်အထား အတည်ပြုစနစ်ကို ဆက်လက်တပ်ဆင်ရန် လိုအပ်ပါသည်။",color=Txt,fontSize=12.sp,modifier=Modifier.padding(top=8.dp))
-    Button(onClick={showInfo=true},modifier=Modifier.fillMaxWidth().padding(top=12.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple),shape=RoundedCornerShape(12.dp)){Icon(Icons.Default.Lock,null);Text(" VIP Activation Setup")}
-   }
-  }}
-  item{Text("မှတ်ချက် - VIP အခွင့်အရေးများကို Admin မှ အမှန်တကယ်ဖွင့်ပေးပြီးမှသာ အသုံးပြုနိုင်ပါမည်။ ဒီအချိန်တွင် VIP status ကို အလိုအလျောက် Active မလုပ်ထားပါ။",color=Muted,fontSize=11.sp,modifier=Modifier.padding(horizontal=18.dp))}
+  item{Text("ငွေလွှဲပြီးနောက် Transaction နံပါတ် ၅ လုံးကို မှန်ကန်စွာ ဖြည့်ပါ။ Admin အတည်ပြုပြီးမှ VIP အသင်းဝင်ဖြစ်ပါမည်။",color=Muted,fontSize=11.sp,modifier=Modifier.padding(horizontal=18.dp))}
  }
- if(showInfo)AlertDialog(onDismissRequest={showInfo=false},title={Text("VIP Activation")},text={Text(if(isSignedIn)"အကောင့်ဝင်ထားပါသည်။ VIP ငွေပေးချေမှုကို အမှန်တကယ်စတင်ရန် Admin ၏ Payment Account နှင့် စျေးနှုန်းများကို အရင်ချိတ်ဆက်ရပါမည်။" else "VIP ဝယ်ယူရန် ZIPMM အကောင့်သို့ အရင်ဝင်ပါ။ ထို့နောက် Admin မှ Payment စနစ်ကို ချိတ်ဆက်ပေးရန် လိုအပ်ပါသည်။")},confirmButton={TextButton(onClick={showInfo=false}){Text("OK")}},dismissButton=if(!isSignedIn)({TextButton(onClick=openAccount){Text("Sign In")}}) else null)
 }
 @Composable private fun VipBenefit(icon: androidx.compose.ui.graphics.vector.ImageVector,title:String,detail:String){
  Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Panel),shape=RoundedCornerShape(13.dp)){
