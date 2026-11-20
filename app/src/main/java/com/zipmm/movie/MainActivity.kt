@@ -378,8 +378,8 @@ private fun zipmmApplyResetCode(email:String,code:String,newPassword:String):Pai
   }else{
    Text(if(signup)"Create ZIPMM Account" else "Sign In",color=Txt,fontSize=19.sp,modifier=Modifier.padding(top=16.dp))
    OutlinedTextField(mail,{mail=it},modifier=Modifier.fillMaxWidth(),label={Text("Email")},singleLine=true)
-   OutlinedTextField(pass,{pass=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Password")},singleLine=true)
-   Button(onClick={if(mail.isNotBlank()&&pass.length>=6)login(mail.trim(),pass,signup)},enabled=!busy,modifier=Modifier.fillMaxWidth().padding(top=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(busy)"Please wait..." else if(signup)"Create Account" else "Sign In")}
+   OutlinedTextField(pass,{pass=it},modifier=Modifier.fillMaxWidth().padding(top=10.dp),label={Text("Password (အနည်းဆုံး 6 လုံး)")},singleLine=true)
+   Button(onClick={login(mail.trim(),pass,signup)},enabled=!busy&&mail.contains("@")&&pass.length>=6,modifier=Modifier.fillMaxWidth().padding(top=16.dp),colors=ButtonDefaults.buttonColors(containerColor=Purple)){Text(if(busy)"Please wait..." else if(signup)"Create Account" else "Sign In")}
    TextButton(onClick={signup=!signup}){Text(if(signup)"Already registered? Sign In" else "Create a new account")}
    if(!signup)TextButton(onClick={resetMode=true;resetMessage=""}){Text("Forgot Password?")}
    if(message.isNotBlank())Text(message,color=Purple2,modifier=Modifier.padding(top=10.dp))
@@ -737,15 +737,19 @@ private suspend fun authRequest(email:String,password:String,signup:Boolean):Pai
    if(code in 200..299){
     val access=j.optString("access_token","")
     if(access.isNotBlank())return@withContext access to "OK"
+    if(signup && j.has("user"))return@withContext null to "အကောင့်ဖန်တီးပြီးပါပြီ။ Email Inbox / Spam ထဲက ZIPMM MOVIE အတည်ပြုလင့်ကိုနှိပ်ပြီးမှ Login ဝင်ပါ။"
     return@withContext null to "Email အတည်ပြုပြီးမှ Login ဝင်နိုင်ပါမယ်။ Inbox နဲ့ Spam ကိုစစ်ပါ။"
    }
    val msg=j.optString("msg",j.optString("message",j.optString("error_description",j.optString("error",""))))
    return@withContext null to when {
     code==400 && msg.contains("Invalid login credentials",true)->"Email သို့မဟုတ် Password မှားနေပါတယ်။"
-    code==400 && msg.contains("Email not confirmed",true)->"Email ကို အရင် Confirm လုပ်ပေးပါ။"
-    code==429->"Login ကြိုးစားမှုများလွန်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်စမ်းပါ။"
+    code==400 && msg.contains("Email not confirmed",true)->"Email ကို အရင် Confirm လုပ်ပေးပါ။ Inbox / Spam စစ်ပါ။"
+    code==400 && (msg.contains("already registered",true)||msg.contains("already been registered",true))->"ဒီ Email နဲ့ အကောင့်ရှိပြီးသားပါ။ Sign In ကိုရွေးပါ။"
+    code==400 && (msg.contains("password",true)||msg.contains("weak",true))->"Password အနည်းဆုံး 6 လုံးနှင့် လုံခြုံသော Password သုံးပါ။"
+    code==422->"Email သို့မဟုတ် Password အချက်အလက် မမှန်ပါ။ ပြန်စစ်ပါ။"
+    code==429->"ကြိုးစားမှုများလွန်းနေပါတယ်။ ခဏစောင့်ပြီး ပြန်စမ်းပါ။"
     code>=500->"Supabase Server မှာ ယာယီပြဿနာရှိနေပါတယ်။ ခဏကြာမှ ပြန်စမ်းပါ။"
-    else->if(msg.isBlank())"Login မအောင်မြင်ပါ။ (HTTP $code)" else msg
+    else->if(msg.isBlank())"Supabase Auth မအောင်မြင်ပါ။ (HTTP $code)" else msg
    }
   }catch(e:Exception){
    lastError=e
